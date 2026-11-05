@@ -1,5 +1,4 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
-import { generateSmartFallbackBuild } from "./hardware-db";
 import realCatalog from "@/data/solotodo-catalog.json";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -16,7 +15,7 @@ function getSampleCatalogContext(budget: number): string {
       solotodoUrl: string;
     }>>;
 
-    let summary = "\n--- MUESTRA DEL CATÁLOGO REAL VIGENTE DE SOLOTODO (CHILE) ---\n";
+    let summary = "\n--- MUESTRA DE COMPONENTES REALES EN SOLOTODO CHILE ---\n";
 
     // CPUs
     summary += "PROCESADORES (CPUs):\n";
@@ -32,37 +31,37 @@ function getSampleCatalogContext(budget: number): string {
 
     // GPUs
     summary += "\nTARJETAS DE VIDEO (GPUs):\n";
-    (cats.gpu || []).slice(0, 10).forEach(g => {
+    (cats.gpu || []).slice(0, 8).forEach(g => {
       summary += `- [ID:${g.id}] ${g.name} | $${g.priceCLP} CLP | TDP: ${g.tdp || "150"}W | URL: ${g.solotodoUrl}\n`;
     });
 
     // RAM
     summary += "\nMEMORIAS RAM:\n";
-    (cats.ram || []).slice(0, 6).forEach(r => {
+    (cats.ram || []).slice(0, 5).forEach(r => {
       summary += `- [ID:${r.id}] ${r.name} | $${r.priceCLP} CLP | URL: ${r.solotodoUrl}\n`;
     });
 
     // Storage
     summary += "\nALMACENAMIENTO:\n";
-    (cats.storage || []).slice(0, 6).forEach(s => {
+    (cats.storage || []).slice(0, 5).forEach(s => {
       summary += `- [ID:${s.id}] ${s.name} | $${s.priceCLP} CLP | URL: ${s.solotodoUrl}\n`;
     });
 
     // PSUs
     summary += "\nFUENTES DE PODER:\n";
-    (cats.psu || []).slice(0, 6).forEach(p => {
+    (cats.psu || []).slice(0, 5).forEach(p => {
       summary += `- [ID:${p.id}] ${p.name} | $${p.priceCLP} CLP | URL: ${p.solotodoUrl}\n`;
     });
 
     // Cases
     summary += "\nGABINETES:\n";
-    (cats.case || []).slice(0, 6).forEach(c => {
+    (cats.case || []).slice(0, 5).forEach(c => {
       summary += `- [ID:${c.id}] ${c.name} | $${c.priceCLP} CLP | URL: ${c.solotodoUrl}\n`;
     });
 
     // Coolers
     summary += "\nCOOLERS:\n";
-    (cats.cooler || []).slice(0, 6).forEach(co => {
+    (cats.cooler || []).slice(0, 5).forEach(co => {
       summary += `- [ID:${co.id}] ${co.name} | $${co.priceCLP} CLP | URL: ${co.solotodoUrl}\n`;
     });
 
@@ -77,40 +76,33 @@ export async function requestBuildFromOpenRouter(
   filters: BuilderFilters,
   apiKey?: string,
   modelName: string = "google/gemma-4-31b-it:free"
-): Promise<{ quote: BuildQuote; source: "openrouter" | "fallback"; modelUsed: string }> {
+): Promise<{ quote: BuildQuote; modelUsed: string }> {
   const token = apiKey || process.env.OPENROUTER_API_KEY;
 
-  if (!token) {
-    console.log("No OpenRouter API key found. Using intelligent hardware engine fallback.");
-    return {
-      quote: generateSmartFallbackBuild(filters),
-      source: "fallback",
-      modelUsed: "Motor Experto SoloTodo (Local Fallback)"
-    };
+  if (!token || token.trim() === "") {
+    throw new Error(
+      "No se ha encontrado la clave de API (OPENROUTER_API_KEY). Por favor verifica que la variable esté configurada en Vercel Settings > Environment Variables."
+    );
   }
 
   const catalogContext = getSampleCatalogContext(filters.budgetCLP);
 
-  const systemPrompt = `
+  const instructions = `
 Eres el Asistente Experto y Asesor Virtual de Hardware para SoloTodo (Chile).
-Tu misión es asesorar a cualquier persona (desde usuarios comunes, estudiantes y trabajadores de oficina, hasta diseñadores y profesionales técnicos) diseñando la cotización de computador más equilibrada, confiable y 100% libre de errores de compatibilidad de hardware en el mercado chileno.
+Diseña la cotización de computador más equilibrada, confiable y 100% libre de errores de compatibilidad física para el mercado chileno.
 
 ${catalogContext}
 
-REGLAS DE ASESORÍA Y COMPATIBILIDAD:
-1. Adapta el lenguaje y enfoque al propósito del usuario:
-   - Para Trabajo y Oficina / Hogar: Prioriza confiabilidad, silencio, bajo consumo eléctrico, arranque veloz (SSD) y relación calidad-precio, sin necesidad de gastar en tarjetas de video caras si el procesador ya cuenta con gráficos integrados suficientes.
-   - Para Diseño, Arquitectura y Edición: Prioriza memoria RAM abundante (32GB+), núcleos de CPU y aceleración gráfica de calidad.
-   - Para Videojuegos: Prioriza equilibrio entre procesador y tarjeta gráfica con alta fluidez.
-   - Para Programación e IA: Prioriza potencia de cómputo, núcleos y memoria.
-2. Utiliza preferentemente componentes reales del catálogo de SoloTodo listado arriba (con sus nombres exactos, precios y URLs).
-3. Precios realistas en Pesos Chilenos (CLP) y no superar el presupuesto máximo.
-4. Compatibilidad física y técnica absoluta:
-   - Zócalos de CPU y placa madre deben coincidir (AM4, AM5, LGA1700, etc.).
-   - Estándar de memoria RAM (DDR4 vs DDR5) soportado por la placa.
-   - Potencia de fuente con holgura segura (>30%) y certificación 80 Plus.
-   - Dimensiones de gabinete aptas para la placa y tarjeta.
-5. Debes responder ÚNICAMENTE con un objeto JSON válido según la estructura requerida.
+REGLAS ESTRICTAS:
+1. Adapta el armado al uso seleccionado:
+   - Oficina / Hogar: Prioriza estabilidad, silencio, bajo consumo y velocidad de arranque (SSD), usando gráficos integrados o tarjeta eficiente sin sobrecosto.
+   - Diseño / Edición: Prioriza 32GB+ de RAM, núcleos de CPU y aceleración gráfica.
+   - Juegos: Prioriza equilibrio CPU-GPU con alta fluidez.
+   - Programación / IA: Prioriza núcleos, RAM y potencia de cómputo.
+2. Utiliza preferentemente los componentes reales del catálogo de SoloTodo listado arriba (con nombres, precios y URLs reales).
+3. Precios en Pesos Chilenos (CLP) sin superar el presupuesto máximo.
+4. Compatibilidad 100%: Zócalo CPU = Placa Madre (AM4, AM5, LGA1700), tipo de RAM soportado (DDR4/DDR5), fuente con más de 30% de holgura.
+5. FORMATO DE SALIDA: Debes responder ÚNICAMENTE con el objeto JSON válido. NO agregues introducciones, comentarios ni texto fuera del JSON.
 
 Estructura JSON requerida:
 {
@@ -118,15 +110,15 @@ Estructura JSON requerida:
   "targetUse": "string",
   "totalBudgetCLP": number,
   "actualCostCLP": number,
-  "performanceSummary": "string (explicación amigable en una frase sobre cómo se sentirá el rendimiento en el uso elegido)",
-  "estimatedFps1080p": number (opcional, aplicable si el uso involucra gráficos o juegos),
-  "estimatedFps1440p": number (opcional),
+  "performanceSummary": "string",
+  "estimatedFps1080p": number,
+  "estimatedFps1440p": number,
   "totalTdpWatts": number,
   "recommendedPsuWatts": number,
   "compatibilityScore": 100,
-  "executiveSummary": "string (explicación clara, amigable y profesional del porqué de este armado)",
+  "executiveSummary": "string",
   "pros": ["string", "string", "string"],
-  "upgradePath": "string (cómo puede extender su vida útil a futuro)",
+  "upgradePath": "string",
   "compatibilityChecks": [
     { "title": "string", "status": "valid", "detail": "string" },
     { "title": "string", "status": "valid", "detail": "string" },
@@ -135,15 +127,15 @@ Estructura JSON requerida:
   "components": [
     {
       "id": "string",
-      "category": "cpu" | "motherboard" | "ram" | "gpu" | "storage" | "psu" | "case" | "cooler",
-      "categoryLabel": "string",
+      "category": "cpu",
+      "categoryLabel": "Procesador",
       "name": "string",
       "brand": "string",
       "specs": "string",
       "priceCLP": number,
       "store": "string",
       "affiliateUrl": "https://www.solotodo.cl",
-      "aiReason": "string (en lenguaje claro explicando el beneficio para el usuario)",
+      "aiReason": "string",
       "compatibilityNote": "string"
     }
   ]
@@ -151,75 +143,101 @@ Estructura JSON requerida:
 `;
 
   const userPrompt = `
-Genera una cotización optimizada para:
+Genera la cotización en JSON para:
 - Presupuesto máximo: $${filters.budgetCLP.toLocaleString('es-CL')} CLP
-- Caso de uso principal: ${filters.useCase}
-- Preferencia de Procesador (CPU): ${filters.cpuPreference}
-- Preferencia de Gráfica (GPU): ${filters.gpuPreference}
-- Almacenamiento deseado: Capacidad ${filters.storageCapacity || '1tb'}, Tipo ${filters.storageType === 'nvme' ? 'M.2 NVMe PCIe' : filters.storageType === 'sata' ? 'SATA SSD 2.5"' : 'El mejor según presupuesto'}
-- Memoria RAM objetivo: ${filters.ramCapacity || '16gb'}
-- Conectividad WiFi integrada en Placa Madre: ${filters.wifiRequired ? 'OBLIGATORIO que la placa madre incluya WiFi' : 'Opcional'}
-- Tipo de Refrigeración: ${filters.coolingPreference === 'liquid' ? 'Refrigeración Líquida (AIO)' : filters.coolingPreference === 'air' ? 'Disipador por aire de torre' : 'La más costo-eficiente'}
-- Tamaño de Gabinete: ${filters.caseSize === 'compact' ? 'Compacto (Micro-ATX / Mini-ITX)' : 'Estándar (Mid-Tower ATX)'}
-- Instrucciones especiales del usuario: ${filters.customInstructions || "Ninguna adicional"}
+- Propósito principal: ${filters.useCase}
+- Preferencia de Procesador: ${filters.cpuPreference}
+- Preferencia de Gráficos: ${filters.gpuPreference}
+- Almacenamiento: Capacidad ${filters.storageCapacity || '1tb'}, Formato ${filters.storageType === 'nvme' ? 'M.2 NVMe' : filters.storageType === 'sata' ? 'SATA SSD' : 'Óptimo'}
+- Memoria RAM: ${filters.ramCapacity || '16gb'}
+- WiFi y Bluetooth integrado: ${filters.wifiRequired ? 'Sí, requerido en placa' : 'Opcional'}
+- Refrigeración: ${filters.coolingPreference === 'liquid' ? 'Líquida AIO' : 'Disipador por Aire'}
+- Chasis: ${filters.caseSize === 'compact' ? 'Compacto Micro-ATX' : 'Estándar ATX'}
+- Instrucciones especiales: ${filters.customInstructions || 'Ninguna'}
 `;
 
-  try {
-    const response = await fetch(OPENROUTER_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "HTTP-Referer": "https://solotodo-ai.vercel.app",
-        "X-Title": "SoloTodo AI PC Builder",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      })
-    });
+  // Modelos a intentar en caso de rate-limit en la capa gratuita
+  const modelsToTry = [
+    modelName,
+    "google/gemma-4-31b-it:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "cohere/north-mini-code:free"
+  ].filter((v, i, a) => a.indexOf(v) === i); // Deduplicar
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("OpenRouter API error:", response.status, errText);
+  let lastError = "";
+
+  for (const currentModel of modelsToTry) {
+    try {
+      console.log(`Intentando consulta con modelo: ${currentModel}...`);
+
+      // Nota: Para compatibilidad universal (especialmente con Gemma y Nemotron),
+      // fusionamos las instrucciones en el mensaje de usuario para evitar errores de provider con 'role: system'.
+      const fullPrompt = `${instructions}\n\n---\nSOLICITUD DEL USUARIO:\n${userPrompt}`;
+
+      const response = await fetch(OPENROUTER_API_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token.trim()}`,
+          "HTTP-Referer": "https://solotodo-ai.vercel.app",
+          "X-Title": "SoloTodo AI PC Builder",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: currentModel,
+          messages: [
+            { role: "user", content: fullPrompt }
+          ],
+          temperature: 0.2
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`Error en OpenRouter con ${currentModel} (${response.status}):`, errText);
+        lastError = `OpenRouter (${response.status}): ${errText}`;
+        // Si es 401 (clave inválida), no tiene sentido seguir reintentando con otros modelos
+        if (response.status === 401) {
+          throw new Error(`Clave de OpenRouter no válida (401 Unauthorized): ${errText}`);
+        }
+        continue;
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+
+      if (!content || content.trim() === "") {
+        lastError = "El modelo devolvió una respuesta vacía.";
+        continue;
+      }
+
+      // Extraer bloque JSON con expresión regular segura
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error("No se encontró JSON válido en el texto devuelto:", content);
+        lastError = "La IA no devolvió un JSON válido.";
+        continue;
+      }
+
+      const parsedQuote: BuildQuote = JSON.parse(jsonMatch[0]);
+
+      // Validar que tenga componentes
+      if (!parsedQuote.components || parsedQuote.components.length === 0) {
+        lastError = "El JSON generado no contiene lista de componentes.";
+        continue;
+      }
+
       return {
-        quote: generateSmartFallbackBuild(filters),
-        source: "fallback",
-        modelUsed: `${modelName} (Error API -> Fallback activado)`
+        quote: parsedQuote,
+        modelUsed: currentModel
       };
+    } catch (err: any) {
+      if (err.message && err.message.includes("401")) {
+        throw err;
+      }
+      lastError = err.message || String(err);
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("Respuesta vacía de OpenRouter");
-    }
-
-    let cleaned = content.trim();
-    if (cleaned.startsWith("```json")) {
-      cleaned = cleaned.replace(/^```json/, "").replace(/```$/, "").trim();
-    } else if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```/, "").replace(/```$/, "").trim();
-    }
-
-    const parsedQuote: BuildQuote = JSON.parse(cleaned);
-    return {
-      quote: parsedQuote,
-      source: "openrouter",
-      modelUsed: modelName
-    };
-  } catch (error) {
-    console.error("Error al procesar con OpenRouter:", error);
-    return {
-      quote: generateSmartFallbackBuild(filters),
-      source: "fallback",
-      modelUsed: `${modelName} (Error parsing -> Fallback activado)`
-    };
   }
+
+  // Si fallaron todos los intentos, lanzar el error real sin inventar respuestas genéricas
+  throw new Error(`No fue posible generar la cotización con la IA de OpenRouter. Detalle: ${lastError}`);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   Cpu, 
   Layers, 
@@ -15,34 +15,31 @@ import {
   ExternalLink, 
   Store, 
   TrendingUp, 
-  Sliders, 
   Copy, 
   Check, 
   MessageSquare, 
   Send, 
-  Settings, 
-  Flame,
-  Wifi,
-  ChevronDown,
-  MonitorPlay,
-  Briefcase,
-  Home,
-  Palette,
-  Code2,
-  HelpCircle,
-  Clock,
-  ThumbsUp
+  Flame, 
+  Wifi, 
+  ChevronDown, 
+  Briefcase, 
+  Home, 
+  Palette, 
+  Code2, 
+  Clock, 
+  ThumbsUp,
+  AlertTriangle,
+  RotateCcw
 } from "lucide-react";
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
 
 export default function HomePage() {
-  // Estado de filtros principales
+  // Filtros de usuario
   const [budget, setBudget] = useState<number>(800000);
   const [useCase, setUseCase] = useState<BuilderFilters["useCase"]>("office");
   const [cpuPref, setCpuPref] = useState<BuilderFilters["cpuPreference"]>("any");
   const [gpuPref, setGpuPref] = useState<BuilderFilters["gpuPreference"]>("any");
 
-  // Filtros de componentes
   const [storageCapacity, setStorageCapacity] = useState<BuilderFilters["storageCapacity"]>("1tb");
   const [storageType, setStorageType] = useState<BuilderFilters["storageType"]>("nvme");
   const [ramCapacity, setRamCapacity] = useState<BuilderFilters["ramCapacity"]>("16gb");
@@ -52,16 +49,11 @@ export default function HomePage() {
   const [customInstructions, setCustomInstructions] = useState<string>("");
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
-  // Estado de cotización y carga
+  // Estado de generación
   const [loading, setLoading] = useState<boolean>(false);
   const [quote, setQuote] = useState<BuildQuote | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modelUsed, setModelUsed] = useState<string>("google/gemma-4-31b-it:free");
-  const [sourceUsed, setSourceUsed] = useState<string>("openrouter");
-  const [isGlobalActive, setIsGlobalActive] = useState<boolean>(false);
-
-  // Configuración de API
-  const [apiKey, setApiKey] = useState<string>("");
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
   // Estado de Chat consultivo
@@ -71,23 +63,13 @@ export default function HomePage() {
   const [messages, setMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([
     {
       sender: "ai",
-      text: "¡Hola! Soy tu Asesor Virtual de SoloTodo. ¿En qué puedo orientarte hoy sobre tu próximo computador?"
+      text: "¡Hola! Soy tu Asesor Virtual de SoloTodo. Configura tus preferencias arriba y presiona 'Generar Cotización' para consultar a la IA."
     }
   ]);
 
-  useEffect(() => {
-    const savedKey = localStorage.getItem("solotodo_openrouter_key");
-    if (savedKey) setApiKey(savedKey);
-  }, []);
-
-  const saveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem("solotodo_openrouter_key", key);
-    setIsSettingsOpen(false);
-  };
-
   const generateQuote = async () => {
     setLoading(true);
+    setErrorMessage(null);
     try {
       const filters: BuilderFilters = {
         budgetCLP: budget,
@@ -106,19 +88,21 @@ export default function HomePage() {
       const res = await fetch("/api/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filters,
-          apiKey,
-          model: modelUsed
-        })
+        body: JSON.stringify({ filters })
       });
 
       const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setErrorMessage(data.error || "Ocurrió un error al contactar con la API de OpenRouter.");
+        setQuote(null);
+        return;
+      }
+
       if (data.quote) {
         setQuote(data.quote);
-        setSourceUsed(data.source);
         setModelUsed(data.modelUsed || modelUsed);
-        if (data.isGlobalKeyActive) setIsGlobalActive(true);
+        setErrorMessage(null);
 
         setMessages([
           {
@@ -127,8 +111,10 @@ export default function HomePage() {
           }
         ]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error al generar cotización:", err);
+      setErrorMessage(err.message || "Error inesperado de red al contactar al servidor.");
+      setQuote(null);
     } finally {
       setLoading(false);
     }
@@ -149,13 +135,11 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMsg,
-          currentBuild: quote,
-          apiKey,
-          model: modelUsed
+          currentBuild: quote
         })
       });
       const data = await res.json();
-      setMessages(prev => [...prev, { sender: "ai", text: data.reply || "Sin respuesta del asistente." }]);
+      setMessages(prev => [...prev, { sender: "ai", text: data.reply || data.error || "Sin respuesta del asistente." }]);
     } catch (err) {
       setMessages(prev => [...prev, { sender: "ai", text: "Hubo un inconveniente al conectar con el asistente." }]);
     } finally {
@@ -185,7 +169,6 @@ export default function HomePage() {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  // Opciones de uso amigables y accesibles
   const useCaseOptions = [
     {
       id: "office" as const,
@@ -237,33 +220,20 @@ export default function HomePage() {
                   Solo<span className="text-orange-500">Todo</span>
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/30 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-orange-400" /> Asesor Inteligente
+                  <Sparkles className="w-3 h-3 text-orange-400" /> Asesor IA
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium">Asesoría de Hardware para Todos los Usuarios · Chile</p>
+              <p className="text-[10px] text-slate-400 font-medium">Asesoría de Hardware en Línea · Chile</p>
             </div>
           </div>
 
-          {/* Badges y Controles superiores */}
+          {/* Información superior */}
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 text-xs text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-lg">
-              <span className={`w-2 h-2 rounded-full ${sourceUsed === "openrouter" || isGlobalActive ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}></span>
-              <span>Modelo: <span className="text-orange-400 font-semibold">{modelUsed.split('/').pop()?.replace(':free', '')}</span></span>
-              {sourceUsed === "openrouter" || isGlobalActive ? (
-                <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[10px] border border-emerald-500/20">En la Nube (Activo)</span>
-              ) : (
-                <span className="text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded text-[10px] border border-amber-500/20">Modo Local</span>
-              )}
+            <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-lg">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="hidden sm:inline text-slate-400">Modelo:</span>
+              <span className="text-orange-400 font-semibold">{modelUsed.split('/').pop()?.replace(':free', '')}</span>
             </div>
-
-            <button 
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-orange-500/20 hover:border-orange-500/50 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700/60 transition shadow-sm"
-              title="Configuración de IA"
-            >
-              <Settings className="w-3.5 h-3.5 text-orange-400" />
-              <span>Configuración</span>
-            </button>
 
             <div className="hidden lg:block text-[11px] text-slate-400 border-l border-slate-800 pl-3">
               TI2082 · ES3 Vicente Sampson
@@ -275,34 +245,59 @@ export default function HomePage() {
       {/* Contenido Principal */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* Hero Banner Inclusivo y Amigable */}
+        {/* Banner de Error Real si falla la API */}
+        {errorMessage && (
+          <div className="bg-red-950/40 border-2 border-red-500/50 rounded-2xl p-6 text-slate-100 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-shake">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-bold text-red-300">Respuesta de la API de OpenRouter</h3>
+                <p className="text-xs text-red-200 mt-1 font-mono break-all bg-black/30 p-2.5 rounded-lg border border-red-500/20">
+                  {errorMessage}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-2">
+                  Si el error menciona "401" o "Authentication", revisa que tu clave en Vercel esté bien guardada. Si menciona "rate-limit" o "provider", puedes presionar reintentar.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={generateQuote}
+              className="shrink-0 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Reintentar</span>
+            </button>
+          </div>
+        )}
+
+        {/* Hero Banner Inclusivo */}
         <section className="bg-gradient-to-r from-orange-950/30 via-slate-900/40 to-slate-900/60 border border-orange-500/20 rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl shadow-orange-950/10">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
           
           <div className="relative z-10 max-w-3xl space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs font-semibold">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" /> Asesoría clara, confiable y sin complicaciones técnicas
+              <ShieldCheck className="w-4 h-4 text-emerald-400" /> Asesoría clara, confiable y con precios reales en Chile
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
               Encuentra el computador perfecto para <span className="text-orange-500">lo que realmente necesitas</span>
             </h1>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              Ya sea para trabajar desde casa, estudiar, editar contenido o jugar, nuestra Inteligencia Artificial selecciona componentes 100% compatibles, duraderos y ajustados a tu presupuesto en tiendas de Chile.
+              Selecciona tu uso y presupuesto. Nuestro asistente con Inteligencia Artificial elegirá componentes 100% compatibles y verificados en tiendas chilenas asociadas a SoloTodo.
             </p>
           </div>
         </section>
 
-        {/* Wizard Consultivo Amigable */}
+        {/* Wizard Consultivo */}
         <section className="bg-[#0e121a] border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-8">
           
-          {/* PASO 1: PROPÓSITO DEL EQUIPO (SELECCIÓN VISUAL) */}
+          {/* PASO 1: PROPÓSITO DEL EQUIPO */}
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 font-bold text-xs flex items-center justify-center border border-orange-500/40">1</span>
                 <h2 className="text-base font-bold text-white">¿Cuál será el uso principal del computador?</h2>
               </div>
-              <span className="text-xs text-slate-400">Selecciona la opción que más se acerque</span>
+              <span className="text-xs text-slate-400">Paso 1 de 3</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
@@ -359,13 +354,13 @@ export default function HomePage() {
                   className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
                 />
                 <div className="flex justify-between text-[11px] text-slate-400">
-                  <span>$350.000 (Básico)</span>
+                  <span>$350.000 (Esencial)</span>
                   <span>$1.500.000 (Avanzado)</span>
                   <span>$3.000.000+ (Profesional)</span>
                 </div>
               </div>
 
-              {/* Botones de Gama / Calidad (Universal) */}
+              {/* Botones de Calidad */}
               <div className="lg:col-span-6 grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: "Esencial", val: 450000, desc: "Hogar y oficina" },
@@ -400,7 +395,7 @@ export default function HomePage() {
                 <span className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 font-bold text-xs flex items-center justify-center border border-orange-500/40">3</span>
                 <h2 className="text-base font-bold text-white">Preferencias de almacenamiento y conectividad</h2>
               </div>
-              <span className="text-xs text-slate-400">Opcional: puedes dejar los valores recomendados</span>
+              <span className="text-xs text-slate-400">Paso 3 de 3</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -415,7 +410,7 @@ export default function HomePage() {
                   onChange={(e) => setStorageCapacity(e.target.value as BuilderFilters["storageCapacity"])}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
                 >
-                  <option value="1tb">1 TB (Recomendado: miles de fotos y programas)</option>
+                  <option value="1tb">1 TB (Recomendado para la mayoría)</option>
                   <option value="500gb">500 GB (Económico para documentos)</option>
                   <option value="2tb">2 TB (Espacio muy amplio para videos/proyectos)</option>
                   <option value="any">Ajustar automáticamente al presupuesto</option>
@@ -451,11 +446,11 @@ export default function HomePage() {
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
                 >
                   <option value="16gb">16 GB (Recomendado para todo público)</option>
-                  <option value="32gb">32 GB (Para diseño pesado, edición o juegos AAA)</option>
+                  <option value="32gb">32 GB (Para diseño pesado, edición o juegos)</option>
                   <option value="64gb">64 GB (Proyectos de ingeniería / IA)</option>
                   <option value="any">Ajustar automáticamente</option>
                 </select>
-                <p className="text-[10px] text-slate-400 mt-1">Permite tener muchas aplicaciones abiertas a la vez.</p>
+                <p className="text-[10px] text-slate-400 mt-1">Permite abrir muchas aplicaciones a la vez.</p>
               </div>
 
               {/* Conectividad WiFi */}
@@ -483,14 +478,14 @@ export default function HomePage() {
 
             </div>
 
-            {/* Opciones avanzadas opcionales */}
+            {/* Opciones técnicas opcionales */}
             <div>
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="text-xs text-orange-400 hover:text-orange-300 font-semibold flex items-center gap-1 transition"
               >
-                <span>{showAdvanced ? "Ocultar preferencias técnicas opcionales" : "+ Preferencias opcionales (Marcas, tamaño de chasis, refrigeración)"}</span>
+                <span>{showAdvanced ? "Ocultar preferencias opcionales" : "+ Preferencias opcionales (Marcas, tamaño de chasis, refrigeración)"}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
               </button>
 
@@ -529,14 +524,14 @@ export default function HomePage() {
                       onChange={(e) => setCaseSize(e.target.value as BuilderFilters["caseSize"])}
                       className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
                     >
-                      <option value="standard">Estándar (Fácil mantención y ventilación)</option>
-                      <option value="compact">Compacto (Ideal para escritorios pequeños)</option>
+                      <option value="standard">Estándar (Fácil ventilación)</option>
+                      <option value="compact">Compacto (Para escritorios pequeños)</option>
                       <option value="any">Cualquiera compatible</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">Comentario o detalle especial</label>
+                    <label className="text-xs text-slate-400 block mb-1">Comentario especial</label>
                     <input 
                       type="text"
                       placeholder="Ej: Priorizar que sea muy silencioso"
@@ -559,12 +554,12 @@ export default function HomePage() {
                 {loading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Diseñando y Validando la Mejor Configuración...</span>
+                    <span>Consultando con la Inteligencia Artificial...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5" />
-                    <span>⚡ Generar Cotización Personalizada con Precios de Chile</span>
+                    <span>⚡ Generar Cotización Personalizada con IA</span>
                   </>
                 )}
               </button>
@@ -573,8 +568,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Estado 1: Pantalla de Bienvenida (Antes de que el usuario cotice) */}
-        {!quote && !loading && (
+        {/* Estado 1: Pantalla de Bienvenida (Antes de cotizar) */}
+        {!quote && !loading && !errorMessage && (
           <section className="bg-[#0e121a]/60 border border-dashed border-slate-800 rounded-2xl p-10 text-center space-y-6">
             <div className="max-w-lg mx-auto space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto text-orange-400">
@@ -583,23 +578,23 @@ export default function HomePage() {
               <h3 className="text-xl font-bold text-white">Asesoría de hardware transparente y a tu alcance</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Selecciona tus necesidades arriba y haz clic en 
-                <span className="text-orange-400 font-semibold"> "Generar Cotización Personalizada"</span>. 
-                Nuestra Inteligencia Artificial verificará que cada pieza encaje a la perfección, sin pagar de más por cosas que no necesitas.
+                <span className="text-orange-400 font-semibold"> "Generar Cotización Personalizada con IA"</span>. 
+                Nuestra IA consultará el catálogo de tiendas chilenas y validará que todas las piezas encajen al 100%.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto pt-4 text-left">
               <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
                 <div className="text-xs font-bold text-orange-400 mb-1">Para Todos los Perfiles</div>
-                <p className="text-[11px] text-slate-400">Desde computadores sencillos y confiables para el hogar u oficina, hasta estaciones de trabajo y gaming.</p>
+                <p className="text-[11px] text-slate-400">Desde computadores para el hogar u oficina, hasta diseño profesional y juegos.</p>
               </div>
               <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
                 <div className="text-xs font-bold text-emerald-400 mb-1">100% Sin Errores</div>
-                <p className="text-[11px] text-slate-400">Validación automática de zócalos, memorias compatibles y fuentes de poder seguras.</p>
+                <p className="text-[11px] text-slate-400">Validación de zócalos, memorias compatibles y fuentes de poder con holgura segura.</p>
               </div>
               <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
                 <div className="text-xs font-bold text-amber-400 mb-1">Precios Reales en Chile</div>
-                <p className="text-[11px] text-slate-400">Comparativa con tiendas chilenas para comprar con el mayor ahorro posible.</p>
+                <p className="text-[11px] text-slate-400">Comparativa con tiendas chilenas asociadas a SoloTodo para cotizar con el mayor ahorro.</p>
               </div>
             </div>
           </section>
@@ -609,9 +604,9 @@ export default function HomePage() {
         {loading && (
           <section className="bg-[#0e121a] border border-orange-500/30 rounded-2xl p-12 text-center space-y-4 shadow-2xl">
             <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <h3 className="text-lg font-bold text-white">Analizando componentes y verificando compatibilidad...</h3>
+            <h3 className="text-lg font-bold text-white">Consultando con la Inteligencia Artificial de OpenRouter...</h3>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              Consultando el catálogo chileno de SoloTodo para encontrar la mejor combinación en relación calidad, precio y durabilidad.
+              Analizando catálogo chileno y validando compatibilidad de zócalos, memorias y fuentes de poder en tiempo real.
             </p>
           </section>
         )}
@@ -647,12 +642,12 @@ export default function HomePage() {
                     className="flex items-center gap-2 text-xs font-semibold bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-xl transition shadow-lg shadow-orange-600/25"
                   >
                     <MessageSquare className="w-4 h-4" />
-                    <span>Hacer Preguntas a la IA</span>
+                    <span>Hacer Preguntas al Asesor</span>
                   </button>
                 </div>
               </div>
 
-              {/* Métricas Clave (KPIs Universales) */}
+              {/* Métricas Clave */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                 
                 {/* Costo vs Presupuesto */}
@@ -668,7 +663,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Desempeño y Respuesta */}
+                {/* Desempeño */}
                 <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
                   <div className="text-xs text-slate-400 mb-1 flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-emerald-400" /> Fluidez y Desempeño
@@ -683,7 +678,7 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {/* Consumo y Ahorro Energético */}
+                {/* Consumo */}
                 <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
                   <div className="text-xs text-slate-400 mb-1 flex items-center gap-1">
                     <Zap className="w-3.5 h-3.5 text-amber-400" /> Consumo y Eficiencia
@@ -705,7 +700,7 @@ export default function HomePage() {
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" /> 100% Compatible
                   </div>
                   <div className="text-[11px] text-slate-400 mt-1">
-                    Componentes verificados en conjunto
+                    Verificado por OpenRouter AI
                   </div>
                 </div>
 
@@ -714,7 +709,7 @@ export default function HomePage() {
               {/* Justificación del Asesor */}
               <div className="mt-6 p-4 rounded-xl bg-orange-950/20 border border-orange-500/20 text-sm text-slate-200">
                 <p className="font-semibold text-orange-400 mb-1 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-orange-400" /> Por qué te recomendamos este equipo:
+                  <Sparkles className="w-4 h-4 text-orange-400" /> Criterio del Asesor con IA:
                 </p>
                 <p className="leading-relaxed">{quote.executiveSummary}</p>
               </div>
@@ -739,11 +734,11 @@ export default function HomePage() {
 
             </div>
 
-            {/* Grilla de Componentes (Tarjetas Amigables) */}
+            {/* Grilla de Componentes */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-orange-400" /> Componentes Sugeridos ({quote.components.length})
+                  <Layers className="w-5 h-5 text-orange-400" /> Componentes Seleccionados ({quote.components.length})
                 </h3>
                 <span className="text-xs text-slate-400">Precios y tiendas verificadas en SoloTodo Chile</span>
               </div>
@@ -826,7 +821,7 @@ export default function HomePage() {
               <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-2 text-orange-400">
                   <TrendingUp className="w-5 h-5" />
-                  <h4 className="text-sm font-bold text-white">Durabilidad y Actualizaciones Futuras</h4>
+                  <h4 className="text-sm font-bold text-white">Durabilidad y Proyección Futura</h4>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">{quote.upgradePath}</p>
               </div>
@@ -837,74 +832,6 @@ export default function HomePage() {
 
       </main>
 
-      {/* Modal de Configuración */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e121a] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2 text-white font-bold">
-                <Settings className="w-5 h-5 text-orange-400" />
-                <span>Configuración de Asesor Virtual</span>
-              </div>
-              <button 
-                onClick={() => setIsSettingsOpen(false)}
-                className="text-slate-400 hover:text-white text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-300">
-              {isGlobalActive 
-                ? "✅ La IA en la nube ya está configurada en el servidor y activa para todos los visitantes."
-                : "La cotización utiliza el modelo gratuito conectado a OpenRouter o el motor inteligente local."}
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Clave de API Personal (Opcional)</label>
-                <input 
-                  type="password"
-                  placeholder="sk-or-v1-xxxxxxxx..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Modelo de Inteligencia Artificial</label>
-                <select 
-                  value={modelUsed}
-                  onChange={(e) => setModelUsed(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-orange-500"
-                >
-                  <option value="google/gemma-4-31b-it:free">Google: Gemma 4 31B (Gratis - Recomendado)</option>
-                  <option value="nvidia/nemotron-3.5-lightning:free">NVIDIA: Nemotron 3.5 Lightning (Gratis - Rápido)</option>
-                  <option value="cohere/north-mini-code:free">Cohere: North Mini Code (Gratis - Precisión)</option>
-                  <option value="google/gemma-4-26b-a4b-it:free">Google: Gemma 4 26B A4B (Gratis)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
-              <button
-                onClick={() => setIsSettingsOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-lg"
-              >
-                Cerrar
-              </button>
-              <button
-                onClick={() => saveApiKey(apiKey)}
-                className="px-4 py-2 text-xs font-bold bg-orange-600 hover:bg-orange-500 text-white rounded-xl shadow-md"
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Drawer de Chat Consultivo */}
       {chatOpen && (
         <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] bg-[#0e121a] border border-orange-500/30 rounded-2xl shadow-2xl flex flex-col h-[480px] overflow-hidden">
@@ -912,7 +839,7 @@ export default function HomePage() {
           <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></div>
-              <span className="text-xs font-bold text-white">Asesor Virtual SoloTodo</span>
+              <span className="text-xs font-bold text-white">Asesor Virtual SoloTodo (OpenRouter)</span>
             </div>
             <button 
               onClick={() => setChatOpen(false)}
