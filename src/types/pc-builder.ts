@@ -35,8 +35,9 @@ export interface BuildQuote {
   targetUse: string;
   totalBudgetCLP: number;
   actualCostCLP: number;
-  estimatedFps1080p: number;
-  estimatedFps1440p: number;
+  performanceSummary: string; // Resumen de rendimiento amigable para todo público
+  estimatedFps1080p?: number;
+  estimatedFps1440p?: number;
   totalTdpWatts: number;
   recommendedPsuWatts: number;
   compatibilityScore: number;
@@ -49,7 +50,7 @@ export interface BuildQuote {
 
 export interface BuilderFilters {
   budgetCLP: number;
-  useCase: 'gaming_1080p' | 'gaming_1440p' | 'streaming_editing' | 'ai_dev' | 'office_school';
+  useCase: 'office' | 'home_study' | 'creative' | 'gaming' | 'dev_data';
   cpuPreference: 'any' | 'amd' | 'intel';
   gpuPreference: 'any' | 'nvidia' | 'amd';
   storageCapacity: '500gb' | '1tb' | '2tb' | 'any';
