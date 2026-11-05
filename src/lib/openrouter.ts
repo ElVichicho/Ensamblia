@@ -151,10 +151,15 @@ Estructura JSON requerida:
   const userPrompt = `
 Genera una cotización optimizada para:
 - Presupuesto máximo: $${filters.budgetCLP.toLocaleString('es-CL')} CLP
-- Caso de uso: ${filters.useCase}
-- Preferencia de CPU: ${filters.cpuPreference}
-- Preferencia de GPU: ${filters.gpuPreference}
-- Instrucciones especiales: ${filters.customInstructions || "Ninguna adicional"}
+- Caso de uso principal: ${filters.useCase}
+- Preferencia de Procesador (CPU): ${filters.cpuPreference}
+- Preferencia de Gráfica (GPU): ${filters.gpuPreference}
+- Almacenamiento deseado: Capacidad ${filters.storageCapacity || '1tb'}, Tipo ${filters.storageType === 'nvme' ? 'M.2 NVMe PCIe' : filters.storageType === 'sata' ? 'SATA SSD 2.5"' : 'El mejor según presupuesto'}
+- Memoria RAM objetivo: ${filters.ramCapacity || '16gb'}
+- Conectividad WiFi integrada en Placa Madre: ${filters.wifiRequired ? 'OBLIGATORIO que la placa madre incluya WiFi' : 'Opcional'}
+- Tipo de Refrigeración: ${filters.coolingPreference === 'liquid' ? 'Refrigeración Líquida (AIO)' : filters.coolingPreference === 'air' ? 'Disipador por aire de torre' : 'La más costo-eficiente'}
+- Tamaño de Gabinete: ${filters.caseSize === 'compact' ? 'Compacto (Micro-ATX / Mini-ITX)' : 'Estándar (Mid-Tower ATX)'}
+- Instrucciones especiales del usuario: ${filters.customInstructions || "Ninguna adicional"}
 `;
 
   try {

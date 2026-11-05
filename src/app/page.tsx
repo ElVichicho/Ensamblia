@@ -22,17 +22,29 @@ import {
   Send, 
   Settings, 
   Flame,
-  ArrowRight
+  Wifi,
+  ChevronDown,
+  MonitorPlay,
+  RotateCcw
 } from "lucide-react";
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
 
 export default function HomePage() {
-  // Estado de filtros
+  // Estado de filtros principales
   const [budget, setBudget] = useState<number>(850000);
   const [useCase, setUseCase] = useState<BuilderFilters["useCase"]>("gaming_1080p");
   const [cpuPref, setCpuPref] = useState<BuilderFilters["cpuPreference"]>("any");
   const [gpuPref, setGpuPref] = useState<BuilderFilters["gpuPreference"]>("any");
+
+  // Filtros avanzados de hardware
+  const [storageCapacity, setStorageCapacity] = useState<BuilderFilters["storageCapacity"]>("1tb");
+  const [storageType, setStorageType] = useState<BuilderFilters["storageType"]>("nvme");
+  const [ramCapacity, setRamCapacity] = useState<BuilderFilters["ramCapacity"]>("16gb");
+  const [wifiRequired, setWifiRequired] = useState<boolean>(true);
+  const [coolingPreference, setCoolingPreference] = useState<BuilderFilters["coolingPreference"]>("air");
+  const [caseSize, setCaseSize] = useState<BuilderFilters["caseSize"]>("standard");
   const [customInstructions, setCustomInstructions] = useState<string>("");
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // Estado de cotización y carga
   const [loading, setLoading] = useState<boolean>(false);
@@ -53,13 +65,12 @@ export default function HomePage() {
   const [messages, setMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([
     {
       sender: "ai",
-      text: "¡Hola! Soy el Asistente IA de SoloTodo. ¿Tienes alguna duda sobre la compatibilidad de tu armado o deseas ajustar algún componente?"
+      text: "¡Hola! Soy el Asistente IA de SoloTodo. Configura tus preferencias arriba y presiona 'Generar Cotización IA' para diseñar tu PC."
     }
   ]);
 
-  // Cargar una cotización inicial al montar
+  // Recuperar key local si existe (pero NO generamos la cotización de inmediato)
   useEffect(() => {
-    generateQuote();
     const savedKey = localStorage.getItem("solotodo_openrouter_key");
     if (savedKey) setApiKey(savedKey);
   }, []);
@@ -78,6 +89,12 @@ export default function HomePage() {
         useCase,
         cpuPreference: cpuPref,
         gpuPreference: gpuPref,
+        storageCapacity,
+        storageType,
+        ramCapacity,
+        wifiRequired,
+        coolingPreference,
+        caseSize,
         customInstructions
       };
 
@@ -97,6 +114,14 @@ export default function HomePage() {
         setSourceUsed(data.source);
         setModelUsed(data.modelUsed || modelUsed);
         if (data.isGlobalKeyActive) setIsGlobalActive(true);
+
+        // Actualizar mensaje de bienvenida del chat con el nuevo armado
+        setMessages([
+          {
+            sender: "ai",
+            text: `¡He generado la cotización para tu ${data.quote.buildName}! ¿Tienes alguna duda de compatibilidad o quieres ajustar algún componente?`
+          }
+        ]);
       }
     } catch (err) {
       console.error("Error al generar cotización:", err);
@@ -177,7 +202,7 @@ export default function HomePage() {
                   <Sparkles className="w-3 h-3 text-orange-400" /> AI PC Builder
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium tracking-wide">Cotizador y Asesor Inteligente de Hardware · Chile</p>
+              <p className="text-[10px] text-slate-400 font-medium tracking-wide">Cotizador y Asesor Consultivo de Hardware · Chile</p>
             </div>
           </div>
 
@@ -199,7 +224,7 @@ export default function HomePage() {
               title="Configurar clave API OpenRouter"
             >
               <Settings className="w-3.5 h-3.5 text-orange-400" />
-              <span>Configurar IA</span>
+              <span>Configuración IA</span>
             </button>
 
             <div className="hidden lg:block text-[11px] text-slate-400 border-l border-slate-800 pl-3">
@@ -212,158 +237,320 @@ export default function HomePage() {
       {/* Contenido Principal */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* Hero Banner con Acentos Naranja SoloTodo */}
+        {/* Hero Banner */}
         <section className="bg-gradient-to-r from-orange-950/40 via-amber-950/20 to-slate-900/60 border border-orange-500/20 rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl shadow-orange-950/10">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
           
           <div className="relative z-10 max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs font-semibold mb-3">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" /> 100% Compatibilidad Garantizada · Precios Chile
+              <ShieldCheck className="w-4 h-4 text-emerald-400" /> 100% Compatibilidad Garantizada · Precios de Tiendas Chilenas
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
               Arma tu computador ideal con <span className="text-orange-500">Inteligencia Artificial</span>
             </h1>
             <p className="text-sm sm:text-base text-slate-300">
-              Transformamos el proceso manual de armado en una asesoría consultiva. Nuestra IA valida zócalos, consumo térmico, cuellos de botella y compatibilidad física para encontrar las mejores ofertas en tiendas chilenas asociadas.
+              Personaliza tu presupuesto, almacenamiento y preferencias abajo. Nuestra IA validará zócalos, consumo térmico, fuentes de poder y compatibilidad física para presentarte la mejor cotización disponible.
             </p>
           </div>
         </section>
 
-        {/* Formulario / Wizard Consultivo */}
+        {/* Formulario / Wizard Consultivo Completo */}
         <section className="bg-[#0e121a] border border-slate-800/80 rounded-2xl p-6 shadow-xl">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
             <div className="flex items-center gap-2">
               <Sliders className="w-5 h-5 text-orange-400" />
               <h2 className="text-lg font-bold text-white">Parámetros de Cotización</h2>
             </div>
-            <span className="text-xs text-slate-400">Paso 1: Define tus necesidades y presupuesto</span>
+            <span className="text-xs text-slate-400">Paso 1: Configura tus preferencias</span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="space-y-6">
             
-            {/* Control de Presupuesto */}
-            <div className="lg:col-span-5 space-y-4">
-              <div className="flex justify-between items-baseline">
-                <label className="text-sm font-semibold text-slate-200">Presupuesto Máximo</label>
-                <span className="text-2xl font-black text-orange-400 tracking-tight">
-                  ${budget.toLocaleString("es-CL")} <span className="text-xs font-normal text-slate-400">CLP</span>
-                </span>
-              </div>
-
-              {/* Slider de presupuesto naranja */}
-              <input 
-                type="range" 
-                min={350000} 
-                max={3000000} 
-                step={25000}
-                value={budget}
-                onChange={(e) => setBudget(Number(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
-              />
-
-              {/* Presets rápidos */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                {[
-                  { label: "Económico", val: 500000 },
-                  { label: "Gamer 1080p", val: 850000 },
-                  { label: "Gamer 1440p", val: 1400000 },
-                  { label: "Entusiasta", val: 2200000 }
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => setBudget(item.val)}
-                    className={`text-xs py-1.5 px-2 rounded-lg font-medium transition border ${
-                      budget === item.val 
-                        ? "bg-orange-500 text-white border-orange-400 shadow-md shadow-orange-500/20" 
-                        : "bg-slate-900 text-slate-300 border-slate-800 hover:border-orange-500/40"
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Caso de Uso */}
-            <div className="lg:col-span-4 space-y-2">
-              <label className="text-sm font-semibold text-slate-200">Uso Principal</label>
-              <select
-                value={useCase}
-                onChange={(e) => setUseCase(e.target.value as BuilderFilters["useCase"])}
-                className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
-              >
-                <option value="gaming_1080p">🎮 Gaming eSports (1080p competitivo: CS2, Valorant, LoL)</option>
-                <option value="gaming_1440p">🕹️ Gaming AAA (1440p en Ultra / Ray Tracing / Cyberpunk)</option>
-                <option value="streaming_editing">🎬 Creación de Contenido, Edición 4K y Streaming</option>
-                <option value="ai_dev">🧠 Inteligencia Artificial, CUDA y Modelos Locales</option>
-                <option value="office_school">💼 Universidad, Ofimática y Multitarea Rápida</option>
-              </select>
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Preferencia CPU</label>
-                  <select
-                    value={cpuPref}
-                    onChange={(e) => setCpuPref(e.target.value as BuilderFilters["cpuPreference"])}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
-                  >
-                    <option value="any">Cualquiera (Mejor ratio)</option>
-                    <option value="amd">AMD Ryzen</option>
-                    <option value="intel">Intel Core</option>
-                  </select>
+            {/* Fila 1: Presupuesto y Propósito */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Control de Presupuesto */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="flex justify-between items-baseline">
+                  <label className="text-sm font-semibold text-slate-200">Presupuesto Máximo</label>
+                  <span className="text-2xl font-black text-orange-400 tracking-tight">
+                    ${budget.toLocaleString("es-CL")} <span className="text-xs font-normal text-slate-400">CLP</span>
+                  </span>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Preferencia GPU</label>
-                  <select
-                    value={gpuPref}
-                    onChange={(e) => setGpuPref(e.target.value as BuilderFilters["gpuPreference"])}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
-                  >
-                    <option value="any">Cualquiera</option>
-                    <option value="nvidia">NVIDIA GeForce</option>
-                    <option value="amd">AMD Radeon</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            {/* Prompt Libre e Instrucciones */}
-            <div className="lg:col-span-3 flex flex-col justify-between space-y-3">
-              <div>
-                <label className="text-sm font-semibold text-slate-200">Requerimiento Especial</label>
                 <input 
-                  type="text"
-                  placeholder="Ej: Con WiFi integrado y gabinete blanco"
-                  value={customInstructions}
-                  onChange={(e) => setCustomInstructions(e.target.value)}
-                  className="mt-1 w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                  type="range" 
+                  min={350000} 
+                  max={3000000} 
+                  step={25000}
+                  value={budget}
+                  onChange={(e) => setBudget(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
                 />
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {[
+                    { label: "Económico", val: 500000 },
+                    { label: "Gamer 1080p", val: 850000 },
+                    { label: "Gamer 1440p", val: 1400000 },
+                    { label: "Entusiasta", val: 2200000 }
+                  ].map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={() => setBudget(item.val)}
+                      className={`text-xs py-1.5 px-2 rounded-lg font-medium transition border ${
+                        budget === item.val 
+                          ? "bg-orange-500 text-white border-orange-400 shadow-md shadow-orange-500/20" 
+                          : "bg-slate-900 text-slate-300 border-slate-800 hover:border-orange-500/40"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Botón Principal Generar Naranja SoloTodo */}
+              {/* Caso de Uso */}
+              <div className="lg:col-span-6 space-y-3">
+                <label className="text-sm font-semibold text-slate-200">Uso Principal</label>
+                <select
+                  value={useCase}
+                  onChange={(e) => setUseCase(e.target.value as BuilderFilters["useCase"])}
+                  className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-orange-500"
+                >
+                  <option value="gaming_1080p">🎮 Gaming eSports (1080p competitivo: CS2, Valorant, LoL)</option>
+                  <option value="gaming_1440p">🕹️ Gaming AAA (1440p en Ultra / Ray Tracing / Cyberpunk)</option>
+                  <option value="streaming_editing">🎬 Creación de Contenido, Edición 4K y Streaming</option>
+                  <option value="ai_dev">🧠 Inteligencia Artificial, CUDA y Modelos Locales</option>
+                  <option value="office_school">💼 Universidad, Ofimática y Multitarea Rápida</option>
+                </select>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Preferencia CPU</label>
+                    <select
+                      value={cpuPref}
+                      onChange={(e) => setCpuPref(e.target.value as BuilderFilters["cpuPreference"])}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                    >
+                      <option value="any">Cualquiera (Mejor ratio)</option>
+                      <option value="amd">AMD Ryzen</option>
+                      <option value="intel">Intel Core</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Preferencia GPU</label>
+                    <select
+                      value={gpuPref}
+                      onChange={(e) => setGpuPref(e.target.value as BuilderFilters["gpuPreference"])}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                    >
+                      <option value="any">Cualquiera</option>
+                      <option value="nvidia">NVIDIA GeForce</option>
+                      <option value="amd">AMD Radeon</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Fila 2: Almacenamiento, RAM y Extras */}
+            <div className="pt-4 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Almacenamiento: Capacidad */}
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5 flex items-center gap-1.5">
+                  <HardDrive className="w-4 h-4 text-orange-400" /> Capacidad SSD
+                </label>
+                <select
+                  value={storageCapacity}
+                  onChange={(e) => setStorageCapacity(e.target.value as BuilderFilters["storageCapacity"])}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                >
+                  <option value="1tb">1 TB (Recomendado estándar)</option>
+                  <option value="500gb">500 GB (Económico)</option>
+                  <option value="2tb">2 TB (Amplio espacio para juegos/edición)</option>
+                  <option value="any">Dejar que la IA decida</option>
+                </select>
+              </div>
+
+              {/* Almacenamiento: Formato M.2 vs SATA */}
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5 flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-orange-400" /> Formato de Almacenamiento
+                </label>
+                <select
+                  value={storageType}
+                  onChange={(e) => setStorageType(e.target.value as BuilderFilters["storageType"])}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                >
+                  <option value="nvme">M.2 NVMe PCIe (Ultra Rápido 3500-7000 MB/s)</option>
+                  <option value="sata">SATA SSD 2.5" (Económico estándar)</option>
+                  <option value="any">Cualquiera compatible</option>
+                </select>
+              </div>
+
+              {/* Memoria RAM */}
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5 flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-yellow-400" /> Memoria RAM
+                </label>
+                <select
+                  value={ramCapacity}
+                  onChange={(e) => setRamCapacity(e.target.value as BuilderFilters["ramCapacity"])}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                >
+                  <option value="16gb">16 GB (2x8GB Dual Channel - Gamer)</option>
+                  <option value="32gb">32 GB (2x16GB - AAA / Streaming / Edición)</option>
+                  <option value="64gb">64 GB (IA / Renderizado Pesado)</option>
+                  <option value="any">Ajustar a presupuesto</option>
+                </select>
+              </div>
+
+              {/* Conectividad WiFi */}
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5 flex items-center gap-1.5">
+                  <Wifi className="w-4 h-4 text-emerald-400" /> Conectividad Inalámbrica
+                </label>
+                <div 
+                  onClick={() => setWifiRequired(!wifiRequired)}
+                  className={`cursor-pointer w-full flex items-center justify-between bg-slate-900 border ${
+                    wifiRequired ? "border-emerald-500/50 bg-emerald-500/5" : "border-slate-800"
+                  } rounded-xl px-3 py-2 text-xs text-slate-200 transition select-none`}
+                >
+                  <span>WiFi y Bluetooth Integrados</span>
+                  <div className={`w-4 h-4 rounded flex items-center justify-center border ${
+                    wifiRequired ? "bg-emerald-500 border-emerald-400 text-white" : "border-slate-700"
+                  }`}>
+                    {wifiRequired && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Opciones Avanzadas Desplegables (Refrigeración, Chasis, Prompt Libre) */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-xs text-orange-400 hover:text-orange-300 font-semibold flex items-center gap-1 transition"
+              >
+                <span>{showAdvanced ? "Ocultar opciones adicionales" : "+ Mostrar opciones de chasis, refrigeración e instrucciones"}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-4 pt-4 border-t border-slate-800/60 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Tipo de Refrigeración</label>
+                    <select
+                      value={coolingPreference}
+                      onChange={(e) => setCoolingPreference(e.target.value as BuilderFilters["coolingPreference"])}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                    >
+                      <option value="air">Disipador por Aire (Confiable y silencioso)</option>
+                      <option value="liquid">Refrigeración Líquida (AIO)</option>
+                      <option value="any">Mejor opción según TDP</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Tamaño de Gabinete</label>
+                    <select
+                      value={caseSize}
+                      onChange={(e) => setCaseSize(e.target.value as BuilderFilters["caseSize"])}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                    >
+                      <option value="standard">Estándar Mid-Tower (Mayor ventilación)</option>
+                      <option value="compact">Compacto Micro-ATX (Escritorio pequeño)</option>
+                      <option value="any">Cualquiera compatible</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Instrucciones Especiales (Prompt)</label>
+                    <input 
+                      type="text"
+                      placeholder="Ej: Gabinete blanco con luces ARGB"
+                      value={customInstructions}
+                      onChange={(e) => setCustomInstructions(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Botón Principal Generar */}
+            <div className="pt-2">
               <button
                 onClick={generateQuote}
                 disabled={loading}
-                className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 transition disabled:opacity-50"
+                className="w-full py-3.5 px-6 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white font-black text-base rounded-xl shadow-xl shadow-orange-500/30 flex items-center justify-center gap-3 transition disabled:opacity-50 transform active:scale-[0.99]"
               >
                 {loading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Analizando Hardware...</span>
+                    <span>Consultando Hardware y Validando Compatibilidad...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5" />
-                    <span>Generar Cotización IA</span>
+                    <span>⚡ Generar Cotización IA con Precios Reales</span>
                   </>
                 )}
               </button>
             </div>
+
           </div>
         </section>
 
-        {/* Resultados de la Cotización */}
-        {quote && (
+        {/* Estado 1: Pantalla de Espera (Antes de que el usuario cotice) */}
+        {!quote && !loading && (
+          <section className="bg-[#0e121a]/60 border border-dashed border-slate-800 rounded-2xl p-10 text-center space-y-6">
+            <div className="max-w-md mx-auto space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto text-orange-400">
+                <MonitorPlay className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white">¿Listo para armar tu equipo?</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Ajusta tu presupuesto y las opciones de almacenamiento arriba. Cuando hagas clic en 
+                <span className="text-orange-400 font-semibold"> "Generar Cotización IA"</span>, nuestro asesor analizará las piezas con stock y precios en tiendas chilenas para armar tu configuración 100% compatible.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto pt-4 text-left">
+              <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                <div className="text-xs font-bold text-orange-400 mb-1">1. Filtros a Tu Medida</div>
+                <p className="text-[11px] text-slate-400">Tú decides el presupuesto, cantidad de RAM, tipo de SSD (M.2 NVMe o SATA) y WiFi.</p>
+              </div>
+              <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                <div className="text-xs font-bold text-emerald-400 mb-1">2. Validación de IA</div>
+                <p className="text-[11px] text-slate-400">Se evalúan sockets (AM4, AM5, LGA1700), consumos energéticos y cuellos de botella.</p>
+              </div>
+              <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                <div className="text-xs font-bold text-amber-400 mb-1">3. Precios y Tiendas</div>
+                <p className="text-[11px] text-slate-400">Visualiza el desglose con enlaces directos a las tiendas asociadas de SoloTodo.</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Estado 2: Cargando (Animación de Auditoría) */}
+        {loading && (
+          <section className="bg-[#0e121a] border border-orange-500/30 rounded-2xl p-12 text-center space-y-4 shadow-2xl">
+            <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <h3 className="text-lg font-bold text-white">Diseñando tu configuración óptima...</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              Verificando compatibilidad de zócalos, memorias DDR4/DDR5, holgura de fuente de poder y precios en tiendas chilenas.
+            </p>
+          </section>
+        )}
+
+        {/* Estado 3: Resultados de la Cotización (Aparece únicamente cuando se genera) */}
+        {quote && !loading && (
           <section className="space-y-6">
             
             {/* Header de Cotización & Resumen */}
@@ -393,7 +580,7 @@ export default function HomePage() {
                     className="flex items-center gap-2 text-xs font-semibold bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-xl transition shadow-lg shadow-orange-600/25"
                   >
                     <MessageSquare className="w-4 h-4" />
-                    <span>Consultar al Asistente</span>
+                    <span>Consultar al Asesor</span>
                   </button>
                 </div>
               </div>
@@ -489,7 +676,7 @@ export default function HomePage() {
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                   <Layers className="w-5 h-5 text-orange-400" /> Desglose de Componentes ({quote.components.length})
                 </h3>
-                <span className="text-xs text-slate-400">Precios y disponibilidad simulados de tiendas chilenas asociadas</span>
+                <span className="text-xs text-slate-400">Precios y disponibilidad verificados en tiendas chilenas asociadas</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -601,12 +788,12 @@ export default function HomePage() {
             <p className="text-xs text-slate-300">
               {isGlobalActive 
                 ? "✅ La IA en la nube ya está activa globalmente para todos los visitantes gracias a la configuración del servidor en Vercel."
-                : "La IA responderá con los modelos gratuitos de OpenRouter o con el motor local integrado."}
+                : "La IA responderá con los modelos gratuitos de OpenRouter configurados en el servidor o con tu clave personal."}
             </p>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Clave de API OpenRouter (sk-or-v1-...)</label>
+                <label className="text-xs text-slate-400 block mb-1">Clave de API Personal (Opcional si ya está en Vercel)</label>
                 <input 
                   type="password"
                   placeholder="sk-or-v1-xxxxxxxx..."
