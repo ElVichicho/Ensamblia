@@ -37,8 +37,9 @@ export default function HomePage() {
   // Estado de cotización y carga
   const [loading, setLoading] = useState<boolean>(false);
   const [quote, setQuote] = useState<BuildQuote | null>(null);
-  const [modelUsed, setModelUsed] = useState<string>("google/gemini-2.0-flash-001");
+  const [modelUsed, setModelUsed] = useState<string>("google/gemma-4-31b-it:free");
   const [sourceUsed, setSourceUsed] = useState<string>("openrouter");
+  const [isGlobalActive, setIsGlobalActive] = useState<boolean>(false);
 
   // Configuración de API
   const [apiKey, setApiKey] = useState<string>("");
@@ -95,6 +96,7 @@ export default function HomePage() {
         setQuote(data.quote);
         setSourceUsed(data.source);
         setModelUsed(data.modelUsed || modelUsed);
+        if (data.isGlobalKeyActive) setIsGlobalActive(true);
       }
     } catch (err) {
       console.error("Error al generar cotización:", err);
@@ -182,9 +184,11 @@ export default function HomePage() {
           {/* Badges y Controles superiores */}
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-2 text-xs text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-lg">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Modelo: <span className="text-orange-400 font-semibold">{modelUsed.split('/').pop()}</span></span>
-              {sourceUsed === "fallback" && (
+              <span className={`w-2 h-2 rounded-full ${sourceUsed === "openrouter" || isGlobalActive ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}></span>
+              <span>Modelo: <span className="text-orange-400 font-semibold">{modelUsed.split('/').pop()?.replace(':free', '')}</span></span>
+              {sourceUsed === "openrouter" || isGlobalActive ? (
+                <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[10px] border border-emerald-500/20">En la Nube (Activo)</span>
+              ) : (
                 <span className="text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded text-[10px] border border-amber-500/20">Modo Local</span>
               )}
             </div>
@@ -595,7 +599,9 @@ export default function HomePage() {
             </div>
 
             <p className="text-xs text-slate-300">
-              Ingresa tu clave de OpenRouter para consultar modelos en la nube en tiempo real (o déjalo en blanco para usar el motor de hardware inteligente simulado de alta precisión).
+              {isGlobalActive 
+                ? "✅ La IA en la nube ya está activa globalmente para todos los visitantes gracias a la configuración del servidor en Vercel."
+                : "La IA responderá con los modelos gratuitos de OpenRouter o con el motor local integrado."}
             </p>
 
             <div className="space-y-3">
@@ -617,10 +623,12 @@ export default function HomePage() {
                   onChange={(e) => setModelUsed(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-orange-500"
                 >
-                  <option value="google/gemini-2.0-flash-001">Google Gemini 2.0 Flash (Rápido y económico)</option>
-                  <option value="meta-llama/llama-3.3-70b-instruct">Meta Llama 3.3 70B Instruct</option>
-                  <option value="deepseek/deepseek-chat">DeepSeek Chat V3</option>
-                  <option value="anthropic/claude-3.5-haiku">Anthropic Claude 3.5 Haiku</option>
+                  <option value="google/gemma-4-31b-it:free">Google: Gemma 4 31B (Gratis - Recomendado)</option>
+                  <option value="nvidia/nemotron-3.5-lightning:free">NVIDIA: Nemotron 3.5 Lightning (Gratis - Rápido)</option>
+                  <option value="cohere/north-mini-code:free">Cohere: North Mini Code (Gratis - Precisión JSON)</option>
+                  <option value="google/gemma-4-26b-a4b-it:free">Google: Gemma 4 26B A4B (Gratis)</option>
+                  <option value="google/gemini-2.0-flash-001">Google: Gemini 2.0 Flash</option>
+                  <option value="meta-llama/llama-3.3-70b-instruct">Meta: Llama 3.3 70B Instruct</option>
                 </select>
               </div>
             </div>

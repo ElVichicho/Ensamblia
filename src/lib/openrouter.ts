@@ -76,7 +76,7 @@ function getSampleCatalogContext(budget: number): string {
 export async function requestBuildFromOpenRouter(
   filters: BuilderFilters,
   apiKey?: string,
-  modelName: string = "google/gemini-2.0-flash-001"
+  modelName: string = "google/gemma-4-31b-it:free"
 ): Promise<{ quote: BuildQuote; source: "openrouter" | "fallback"; modelUsed: string }> {
   const token = apiKey || process.env.OPENROUTER_API_KEY;
 

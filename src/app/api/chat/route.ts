@@ -4,20 +4,26 @@ const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, currentBuild, apiKey, model = "google/gemini-2.0-flash-001" } = await req.json();
-    const token = apiKey || process.env.OPENROUTER_API_KEY;
+    const body = await req.json();
+    const { message, currentBuild } = body;
+
+    const apiKey = (body.apiKey && body.apiKey.trim().length > 0)
+      ? body.apiKey.trim()
+      : process.env.OPENROUTER_API_KEY;
+
+    const defaultModel = process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free";
+    const model = body.model || defaultModel;
 
     if (!message) {
       return NextResponse.json({ error: "Mensaje requerido" }, { status: 400 });
     }
 
-    if (!token) {
-      // Respuesta de asesoría simulada inteligente
+    if (!apiKey) {
       return NextResponse.json({
-        reply: `[Modo Consultivo SoloTodo AI] Sobre tu consulta: "${message}":
+        reply: `[Modo Consultivo SoloTodo Local] Sobre tu consulta: "${message}":
 Analizando la configuración actual (${currentBuild?.buildName || "PC SoloTodo"}):
 - Compatibilidad: La arquitectura de los componentes seleccionados permite un flujo óptimo de energía y disipación térmica.
-- Recomendación: Si deseas actualizar o cambiar algún componente, te sugerimos verificar el margen de la fuente de poder (PSU) y el espacio en el chasis. ¡Todos los enlaces hacia las tiendas chilenas cuentan con stock verificado en SoloTodo!`
+- Recomendación: Si deseas actualizar o cambiar algún componente, te sugerimos verificar el margen de la fuente de poder (PSU) y el espacio en el chasis. ¡Todos los componentes seleccionados cuentan con disponibilidad en tiendas chilenas!`
       });
     }
 
@@ -31,7 +37,7 @@ Enfócate en compatibilidad física, cuellos de botella, fuentes de poder, socke
     const response = await fetch(OPENROUTER_API_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        "Authorization": `Bearer ${apiKey}`,
         "HTTP-Referer": "https://solotodo-ai.vercel.app",
         "X-Title": "SoloTodo AI Chat",
         "Content-Type": "application/json"
@@ -48,7 +54,7 @@ Enfócate en compatibilidad física, cuellos de botella, fuentes de poder, socke
 
     if (!response.ok) {
       return NextResponse.json({
-        reply: "No pude conectar con el modelo en este momento. Sin embargo, la configuración actual de tu equipo es 100% compatible y equilibrada para el mercado chileno."
+        reply: "El asesor en la nube no pudo responder en este instante. No obstante, tu configuración actual es 100% compatible y equilibrada para el mercado chileno."
       });
     }
 
