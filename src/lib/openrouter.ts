@@ -112,7 +112,7 @@ REGLAS ESTRICTAS:
 2. Usa EXCLUSIVAMENTE IDs del catálogo. Cada ID debe mantener su categoría, nombre, precio y URL. No uses una GPU como storage. Escoge RAM DIMM de escritorio, no SO-DIMM. Suma todos los precios antes de finalizar.
 3. Precios en Pesos Chilenos (CLP) sin superar el presupuesto máximo.
 4. Comprueba compatibilidad: Zócalo CPU = Placa Madre (AM4, AM5, LGA1700), tipo de RAM soportado (DDR4/DDR5), fuente con más de 30% de holgura.
-5. Incluye cpu, motherboard, ram, storage, psu y case, además de gpu y cooler cuando sean necesarios. Los campos descriptivos deben tener como máximo 20 palabras. No inventes FPS sin mediciones.
+5. Incluye cpu, motherboard, ram, storage, psu y case, además de gpu OBLIGATORIA para gaming y cooler cuando sea necesario. Los campos descriptivos deben tener como máximo 20 palabras. No inventes FPS sin mediciones.
 6. FORMATO DE SALIDA: Debes responder ÚNICAMENTE con el objeto JSON válido. NO agregues texto fuera del JSON. Usa una frase breve por campo descriptivo.
 
 Estructura JSON requerida:
@@ -280,6 +280,7 @@ Genera la cotización en JSON para:
       delete parsedQuote.estimatedFps1080p;
       delete parsedQuote.estimatedFps1440p;
       const required = ["cpu", "motherboard", "ram", "storage", "psu", "case"];
+      if (filters.useCase === "gaming") required.push("gpu");
       if (required.some(category => !parsedQuote.components.some(item => item.category === category))) {
         throw new Error("La IA omitió componentes esenciales del equipo.");
       }
