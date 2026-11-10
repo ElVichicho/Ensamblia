@@ -1,8 +1,7 @@
-import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
+import { BuildQuote, BuilderFilters, ComponentItem } from "@/types/pc-builder";
 import realCatalog from "@/data/solotodo-catalog.json";
 
 export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3.5-lightning:free";
-
 export const OPENROUTER_RATE_LIMIT_MESSAGE =
   "OpenRouter alcanzó el límite temporal de uso gratuito. Espera antes de volver a intentar.";
 
@@ -11,312 +10,111 @@ export function getFreeOpenRouterModel() {
   return configured?.endsWith(":free") ? configured : DEFAULT_OPENROUTER_MODEL;
 }
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const catalog = Object.values(realCatalog.categories).flat();
+const labels: Record<string, string> = {
+  cpu: "Procesador", motherboard: "Placa madre", ram: "Memoria RAM",
+  gpu: "Tarjeta gráfica", storage: "Almacenamiento", psu: "Fuente de poder",
+  case: "Gabinete", cooler: "Refrigeración",
+};
 
-function getSampleCatalogContext(budget: number): string {
-  try {
-    const cats = realCatalog.categories as Record<string, Array<{
-      id: number;
-      name: string;
-      priceCLP: number;
-      socket?: string | null;
-      tdp?: number | null;
-      format?: string | null;
-      solotodoUrl: string;
-    }>>;
-
-    let summary = "\n--- MUESTRA DE COMPONENTES REALES EN SOLOTODO CHILE ---\n";
-
-    // CPUs
-    summary += "PROCESADORES (CPUs):\n";
-    (cats.cpu || []).slice(0, 10).forEach(c => {
-      summary += `- [ID:${c.id}] ${c.name} | $${c.priceCLP} CLP | Socket: ${c.socket || "N/A"} | TDP: ${c.tdp ?? "desconocido"}W | URL: ${c.solotodoUrl}\n`;
-    });
-
-    // Motherboards
-    summary += "\nPLACAS MADRE:\n";
-    (cats.motherboard || []).slice(0, 10).forEach(m => {
-      summary += `- [ID:${m.id}] ${m.name} | $${m.priceCLP} CLP | Socket: ${m.socket || "N/A"} | Formato: ${m.format || "desconocido"} | URL: ${m.solotodoUrl}\n`;
-    });
-
-    // GPUs
-    summary += "\nTARJETAS DE VIDEO (GPUs):\n";
-    (cats.gpu || []).slice(0, 8).forEach(g => {
-      summary += `- [ID:${g.id}] ${g.name} | $${g.priceCLP} CLP | TDP: ${g.tdp ?? "desconocido"}W | URL: ${g.solotodoUrl}\n`;
-    });
-
-    // RAM
-    summary += "\nMEMORIAS RAM:\n";
-    (cats.ram || []).slice(0, 5).forEach(r => {
-      summary += `- [ID:${r.id}] ${r.name} | $${r.priceCLP} CLP | URL: ${r.solotodoUrl}\n`;
-    });
-
-    // Storage
-    summary += "\nALMACENAMIENTO:\n";
-    (cats.storage || []).slice(0, 5).forEach(s => {
-      summary += `- [ID:${s.id}] ${s.name} | $${s.priceCLP} CLP | URL: ${s.solotodoUrl}\n`;
-    });
-
-    // PSUs
-    summary += "\nFUENTES DE PODER:\n";
-    (cats.psu || []).slice(0, 5).forEach(p => {
-      summary += `- [ID:${p.id}] ${p.name} | $${p.priceCLP} CLP | URL: ${p.solotodoUrl}\n`;
-    });
-
-    // Cases
-    summary += "\nGABINETES:\n";
-    (cats.case || []).slice(0, 5).forEach(c => {
-      summary += `- [ID:${c.id}] ${c.name} | $${c.priceCLP} CLP | URL: ${c.solotodoUrl}\n`;
-    });
-
-    // Coolers
-    summary += "\nCOOLERS:\n";
-    (cats.cooler || []).slice(0, 5).forEach(co => {
-      summary += `- [ID:${co.id}] ${co.name} | $${co.priceCLP} CLP | URL: ${co.solotodoUrl}\n`;
-    });
-
-    summary += "--- FIN DEL CATÁLOGO ---\n";
-    return summary;
-  } catch (e) {
-    return "";
+function createQuote(content: string, filters: BuilderFilters): BuildQuote {
+  const match = content.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("La IA no devolvió un JSON válido.");
+  const result = JSON.parse(match[0]);
+  if (typeof result.buildName !== "string" || typeof result.summary !== "string" ||
+      typeof result.upgradePath !== "string" || !Array.isArray(result.components)) {
+    throw new Error("La selección de la IA está incompleta.");
   }
+  const seen = new Set<string>();
+  const components: ComponentItem[] = result.components.map((choice: { id: unknown; reason: unknown }) => {
+    const source = catalog.find(product => String(product.id) === String(choice?.id));
+    if (!source || typeof choice.reason !== "string") {
+      throw new Error(`ID inválido: ${choice?.id}. Usa IDs exactos del catálogo.`);
+    }
+    if (seen.has(source.category)) throw new Error("Selecciona una pieza por categoría.");
+    seen.add(source.category);
+    return {
+      id: String(source.id), category: source.category as ComponentItem["category"],
+      categoryLabel: labels[source.category], name: source.name,
+      brand: source.name.split(" ")[0], specs: source.name,
+      priceCLP: source.priceCLP, store: source.store, affiliateUrl: source.solotodoUrl,
+      aiReason: choice.reason,
+      compatibilityNote: "Verificar especificaciones y soporte del fabricante antes de comprar.",
+    };
+  });
+  const required = ["cpu", "motherboard", "ram", "storage", "psu", "case"];
+  if (filters.useCase === "gaming") required.push("gpu");
+  if (required.some(category => !seen.has(category))) throw new Error("Faltan componentes esenciales.");
+  const actualCostCLP = components.reduce((sum, item) => sum + item.priceCLP, 0);
+  if (actualCostCLP > filters.budgetCLP) {
+    throw new Error(`El total es ${actualCostCLP}, superior al presupuesto ${filters.budgetCLP}. Elige piezas más económicas.`);
+  }
+  const cpu = catalog.find(product => String(product.id) === components.find(item => item.category === "cpu")?.id);
+  const motherboard = catalog.find(product => String(product.id) === components.find(item => item.category === "motherboard")?.id);
+  const socketVerified = Boolean(cpu?.socket && motherboard?.socket && cpu.socket === motherboard.socket);
+  if (cpu?.socket && motherboard?.socket && !socketVerified) throw new Error("Socket de CPU y placa madre incompatible.");
+  return {
+    buildName: result.buildName, targetUse: filters.useCase,
+    totalBudgetCLP: filters.budgetCLP, actualCostCLP,
+    performanceSummary: result.summary, executiveSummary: result.summary,
+    totalTdpWatts: 0, recommendedPsuWatts: 0, compatibilityScore: 0,
+    pros: [], upgradePath: result.upgradePath, components,
+    compatibilityChecks: [
+      { title: "Socket CPU y placa", status: socketVerified ? "valid" : "warning",
+        detail: socketVerified ? `Socket ${cpu?.socket} coincidente en el catálogo.` : "El catálogo no permite verificar ambos sockets." },
+      { title: "RAM, BIOS, dimensiones y alimentación", status: "warning",
+        detail: "Requieren comprobación con las fichas de los fabricantes. Consumo y fuente recomendada pendientes de cálculo." },
+    ],
+  };
 }
 
 export async function requestBuildFromOpenRouter(
-  filters: BuilderFilters,
-  apiKey?: string,
-  modelName = DEFAULT_OPENROUTER_MODEL
+  filters: BuilderFilters, apiKey?: string, modelName = DEFAULT_OPENROUTER_MODEL,
 ): Promise<{ quote: BuildQuote; modelUsed: string }> {
   const token = apiKey || process.env.OPENROUTER_API_KEY;
-
-  if (!token || token.trim() === "") {
-    throw new Error(
-      "No se ha encontrado la clave de API (OPENROUTER_API_KEY). Por favor verifica que la variable esté configurada en Vercel Settings > Environment Variables."
-    );
-  }
-
-  const catalogContext = getSampleCatalogContext(filters.budgetCLP);
-
-  const instructions = `
-Eres el Asistente Experto y Asesor Virtual de Hardware para SoloTodo (Chile).
-Diseña una cotización equilibrada para el mercado chileno. Señala con status warning cualquier compatibilidad que los datos no permitan verificar.
-
-${catalogContext}
-
-REGLAS ESTRICTAS:
-1. Adapta el armado al uso seleccionado:
-   - Oficina / Hogar: Prioriza estabilidad, silencio, bajo consumo y velocidad de arranque (SSD), usando gráficos integrados o tarjeta eficiente sin sobrecosto.
-   - Diseño / Edición: Prioriza 32GB+ de RAM, núcleos de CPU y aceleración gráfica.
-   - Juegos: Prioriza equilibrio CPU-GPU con alta fluidez.
-   - Programación / IA: Prioriza núcleos, RAM y potencia de cómputo.
-2. Usa EXCLUSIVAMENTE IDs del catálogo. Cada ID debe mantener su categoría, nombre, precio y URL. No uses una GPU como storage. Escoge RAM DIMM de escritorio, no SO-DIMM. Suma todos los precios antes de finalizar.
-3. Precios en Pesos Chilenos (CLP) sin superar el presupuesto máximo.
-4. Comprueba compatibilidad: Zócalo CPU = Placa Madre (AM4, AM5, LGA1700), tipo de RAM soportado (DDR4/DDR5), fuente con más de 30% de holgura.
-5. Incluye cpu, motherboard, ram, storage, psu y case, además de gpu OBLIGATORIA para gaming y cooler cuando sea necesario. Los campos descriptivos deben tener como máximo 20 palabras. No inventes FPS sin mediciones.
-6. FORMATO DE SALIDA: Debes responder ÚNICAMENTE con el objeto JSON válido. NO agregues texto fuera del JSON. Usa una frase breve por campo descriptivo.
-
-Estructura JSON requerida:
-{
-  "buildName": "string",
-  "targetUse": "string",
-  "totalBudgetCLP": number,
-  "actualCostCLP": number,
-  "performanceSummary": "string",
-  "estimatedFps1080p": number,
-  "estimatedFps1440p": number,
-  "totalTdpWatts": number,
-  "recommendedPsuWatts": number,
-  "compatibilityScore": number,
-  "executiveSummary": "string",
-  "pros": ["string", "string", "string"],
-  "upgradePath": "string",
-  "compatibilityChecks": [
-    { "title": "string", "status": "valid", "detail": "string" },
-    { "title": "string", "status": "valid", "detail": "string" },
-    { "title": "string", "status": "valid", "detail": "string" }
-  ],
-  "components": [
-    {
-      "id": "string",
-      "category": "cpu",
-      "categoryLabel": "Procesador",
-      "name": "string",
-      "brand": "string",
-      "specs": "string",
-      "priceCLP": number,
-      "store": "string",
-      "affiliateUrl": "https://www.solotodo.cl",
-      "aiReason": "string",
-      "compatibilityNote": "string"
-    }
-  ]
-}
-`;
-
-  const userPrompt = `
-Genera la cotización en JSON para:
-- Presupuesto máximo: $${filters.budgetCLP.toLocaleString('es-CL')} CLP
-- Propósito principal: ${filters.useCase}
-- Preferencia de Procesador: ${filters.cpuPreference}
-- Preferencia de Gráficos: ${filters.gpuPreference}
-- Almacenamiento: Capacidad ${filters.storageCapacity || '1tb'}, Formato ${filters.storageType === 'nvme' ? 'M.2 NVMe' : filters.storageType === 'sata' ? 'SATA SSD' : 'Óptimo'}
-- Memoria RAM: ${filters.ramCapacity || '16gb'}
-- WiFi y Bluetooth integrado: ${filters.wifiRequired ? 'Sí, requerido en placa' : 'Opcional'}
-- Refrigeración: ${filters.coolingPreference === 'liquid' ? 'Líquida AIO' : 'Disipador por Aire'}
-- Chasis: ${filters.caseSize === 'compact' ? 'Compacto Micro-ATX' : 'Estándar ATX'}
-- Instrucciones especiales: ${filters.customInstructions || 'Ninguna'}
-`;
-
-  const modelsToTry = [modelName, modelName];
+  if (!token?.trim()) throw new Error("Falta configurar OPENROUTER_API_KEY en el servidor.");
+  const candidates = Object.entries(realCatalog.categories).flatMap(([category, products]) =>
+    products.filter(product => product.priceCLP > 0 && product.priceCLP <= filters.budgetCLP &&
+      !(category === "ram" && product.name.includes("SO-DIMM")))
+      .sort((a, b) => a.priceCLP - b.priceCLP)
+      .slice(0, 8)
+      .map(product => ({ id: product.id, category, name: product.name, priceCLP: product.priceCLP, socket: product.socket }))
+  );
+  const prompt = `Selecciona un PC completo para estas preferencias: ${JSON.stringify(filters)}.
+Catálogo: ${JSON.stringify(candidates)}
+Usa exclusivamente IDs de este catálogo, una pieza por categoría. Obligatorios cpu, motherboard, ram, storage, psu, case; gpu obligatoria para gaming. Cooler si hace falta.
+Respeta socket, RAM y presupuesto TOTAL. Si una preferencia no se puede satisfacer, indícalo en summary.
+Responde SOLO JSON breve sin markdown ni razonamiento:
+{"buildName":"nombre breve","summary":"resumen y limitaciones, máximo 40 palabras","upgradePath":"mejora futura breve","components":[{"id":123,"reason":"motivo de máximo 8 palabras"}]}
+Incluye todas las piezas. No repitas nombres, precios, URLs ni especificaciones en la respuesta.`;
+  const messages = [{ role: "user", content: prompt }];
   const deadline = Date.now() + 50000;
-  let previousContent = "";
   let lastError = "";
-
-  for (const currentModel of modelsToTry) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 5000) break;
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token.trim()}`, "Content-Type": "application/json",
+        "HTTP-Referer": "https://solotodo-aiproject.vercel.app", "X-Title": "SoloTodo AI PC Builder" },
+      body: JSON.stringify({
+        model: modelName, messages, temperature: 0.1, max_tokens: 1000,
+        ...(modelName === DEFAULT_OPENROUTER_MODEL && { reasoning: { enabled: false } }),
+      }),
+      signal: AbortSignal.timeout(Math.min(30000, remaining)),
+    });
+    const data = await response.json();
+    if (response.status === 429) throw new Error(OPENROUTER_RATE_LIMIT_MESSAGE);
+    if (!response.ok || data.error) throw new Error(`OpenRouter respondió con error ${response.status}.`);
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content.trim()) throw new Error("OpenRouter devolvió una respuesta vacía.");
     try {
-      console.log(`Intentando consulta con modelo: ${currentModel}...`);
-
-      const fullPrompt = `${instructions}\n\n---\nSOLICITUD DEL USUARIO:\n${userPrompt}`;
-
-      const response = await fetch(OPENROUTER_API_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token.trim()}`,
-          "HTTP-Referer": "https://solotodo-aiproject.vercel.app",
-          "X-Title": "SoloTodo AI PC Builder",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: currentModel,
-          messages: [
-            { role: "user", content: fullPrompt },
-            ...(previousContent ? [
-              { role: "assistant", content: previousContent },
-              { role: "user", content: `Corrige el JSON completo. Error detectado: ${lastError}. Copia los IDs EXACTOS de la categoría correspondiente del catálogo y respeta el presupuesto.` },
-            ] : []),
-          ],
-          temperature: 0.2,
-          max_tokens: 3200,
-          ...(currentModel === DEFAULT_OPENROUTER_MODEL && {
-            reasoning: { enabled: false },
-          }),
-          ...(currentModel === "openrouter/free" && {
-            response_format: { type: "json_object" },
-          }),
-        }),
-        signal: AbortSignal.timeout(Math.max(1, Math.min(45000, deadline - Date.now()))),
-      });
-      const rawResponseText = await response.text();
-
-      if (response.status === 429) throw new Error(OPENROUTER_RATE_LIMIT_MESSAGE);
-
-      if (!response.ok) {
-        console.error(`Error en OpenRouter con ${currentModel} (${response.status}):`, rawResponseText);
-        lastError = `OpenRouter (${response.status}): ${rawResponseText.slice(0, 200)}`;
-        if (response.status === 401) {
-          throw new Error(`Clave de OpenRouter no válida (401 Unauthorized): ${rawResponseText}`);
-        }
-        continue;
-      }
-
-      let data: any;
-      try {
-        data = JSON.parse(rawResponseText);
-      } catch {
-        lastError = `El proveedor envió texto en vez de JSON: ${rawResponseText.slice(0, 150)}`;
-        continue;
-      }
-
-      if (data.error) {
-        lastError = `Error de API: ${data.error.message || JSON.stringify(data.error)}`;
-        continue;
-      }
-
-      if (data.choices?.[0]?.finish_reason === "length") {
-        throw new Error("La IA agotó el límite de salida antes de completar la cotización.");
-      }
-      const content = data.choices?.[0]?.message?.content;
-
-      if (!content || content.trim() === "") {
-        lastError = "El modelo devolvió una respuesta vacía.";
-        continue;
-      }
-
-      previousContent = content;
-
-      // Extraer bloque JSON con expresión regular segura
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error("No se encontró JSON válido en el texto devuelto:", content);
-        lastError = "La IA no devolvió un JSON con la estructura esperada.";
-        continue;
-      }
-
-      const parsedQuote: BuildQuote = JSON.parse(jsonMatch[0]);
-
-      // Reject partial responses before passing them to the UI.
-      if (!Array.isArray(parsedQuote.components) || parsedQuote.components.length === 0) {
-        lastError = "El JSON generado no contiene lista de componentes.";
-        continue;
-      }
-
-      const textFields = ["buildName", "targetUse", "performanceSummary", "executiveSummary", "upgradePath"] as const;
-      const numericFields = ["totalBudgetCLP", "actualCostCLP", "totalTdpWatts", "recommendedPsuWatts", "compatibilityScore"] as const;
-      if (textFields.some(key => typeof parsedQuote[key] !== "string") ||
-          numericFields.some(key => !Number.isFinite(parsedQuote[key])) ||
-          !Array.isArray(parsedQuote.pros) ||
-          !Array.isArray(parsedQuote.compatibilityChecks)) {
-        throw new Error("La cotización de la IA está incompleta.");
-      }
-      if (parsedQuote.components.some(item =>
-        !item || !["cpu", "motherboard", "ram", "gpu", "storage", "psu", "case", "cooler"].includes(item.category) ||
-        !Number.isFinite(item.priceCLP) || item.priceCLP <= 0 ||
-        ["id", "categoryLabel", "name", "brand", "specs", "store", "affiliateUrl", "aiReason", "compatibilityNote"]
-          .some(key => typeof item[key as keyof typeof item] !== "string")
-      )) {
-        throw new Error("La IA devolvió componentes con datos incompletos.");
-      }
-      const catalogItems = Object.values(realCatalog.categories).flat();
-      for (const item of parsedQuote.components) {
-        const source = catalogItems.find(product => String(product.id) === String(item.id));
-        if (!source || source.category !== item.category) {
-          throw new Error(`Producto inválido: ID ${item.id} como ${item.category}. Selecciona otro ID exacto de esa categoría.`);
-        }
-        item.name = source.name;
-        item.priceCLP = source.priceCLP;
-        item.affiliateUrl = source.solotodoUrl;
-        item.store = source.store;
-      }
-      delete parsedQuote.estimatedFps1080p;
-      delete parsedQuote.estimatedFps1440p;
-      const required = ["cpu", "motherboard", "ram", "storage", "psu", "case"];
-      if (filters.useCase === "gaming") required.push("gpu");
-      if (required.some(category => !parsedQuote.components.some(item => item.category === category))) {
-        throw new Error("La IA omitió componentes esenciales del equipo.");
-      }
-      parsedQuote.actualCostCLP = parsedQuote.components.reduce((sum, item) => sum + item.priceCLP, 0);
-      parsedQuote.totalBudgetCLP = filters.budgetCLP;
-      if (parsedQuote.actualCostCLP > filters.budgetCLP) {
-        throw new Error("La cotización de la IA supera el presupuesto solicitado.");
-      }
-
-      return {
-        quote: parsedQuote,
-        modelUsed: data.model || currentModel
-      };
-    } catch (err: any) {
-      if (err.message === OPENROUTER_RATE_LIMIT_MESSAGE || err.message?.includes("401")) {
-        throw err;
-      }
-      if (Date.now() >= deadline) throw new Error("Se agotó el tiempo disponible para generar la cotización.");
-      if (err.name === "TimeoutError") {
-        lastError = `Tiempo de espera agotado con ${currentModel} (más de 45s).`;
-      } else {
-        lastError = err.message || String(err);
-      }
+      if (data.choices[0].finish_reason === "length") throw new Error("JSON incompleto por límite de salida.");
+      return { quote: createQuote(content, filters), modelUsed: data.model || modelName };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Selección inválida.";
+      messages.push({ role: "assistant", content }, { role: "user", content: `Corrige el JSON. ${lastError}` });
     }
   }
-
-  // Si fallaron todos los intentos, lanzar el error real sin inventar respuestas genéricas
-  throw new Error(`No fue posible generar la cotización con la IA de OpenRouter. Detalle: ${lastError}`);
+  throw new Error(`No se pudo completar una selección válida: ${lastError}`);
 }

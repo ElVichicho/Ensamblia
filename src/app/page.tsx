@@ -151,7 +151,7 @@ export default function HomePage() {
 
   const copyBuildSummary = () => {
     if (!quote) return;
-    const text = `Cotización SoloTodo: ${quote.buildName}\nCosto Total: $${quote.actualCostCLP.toLocaleString('es-CL')} CLP\n\nComponentes recomendados:\n${quote.components.map(c => `- ${c.categoryLabel}: ${c.name} ($${c.priceCLP.toLocaleString('es-CL')} CLP en ${c.store})`).join('\n')}\n\nCompatibilidad: 100% Verificada`;
+    const text = `Cotización SoloTodo: ${quote.buildName}\nCosto Total: $${quote.actualCostCLP.toLocaleString('es-CL')} CLP\n\nComponentes recomendados:\n${quote.components.map(c => `- ${c.categoryLabel}: ${c.name} ($${c.priceCLP.toLocaleString('es-CL')} CLP en ${c.store})`).join('\n')}\n\nCompatibilidad: revisar comprobaciones y advertencias`;
     navigator.clipboard.writeText(text);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -544,7 +544,7 @@ export default function HomePage() {
               <p className="text-xs text-slate-600 leading-relaxed">
                 Selecciona tus necesidades arriba y haz clic en
                 <span className="text-orange-700 font-semibold"> "Generar cotización"</span>.
-                Nuestra IA consultará el catálogo de tiendas chilenas y validará que todas las piezas encajen al 100%.
+                La IA seleccionará componentes del catálogo y mostrará las comprobaciones de compatibilidad pendientes.
               </p>
             </div>
 
@@ -554,7 +554,7 @@ export default function HomePage() {
                 <p className="text-[11px] text-slate-600">Desde computadores para el hogar u oficina, hasta diseño profesional y juegos.</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <div className="text-xs font-bold text-emerald-700 mb-1">100% Sin Errores</div>
+                <div className="text-xs font-bold text-emerald-700 mb-1">Comprobaciones de catálogo</div>
                 <p className="text-[11px] text-slate-600">Validación de zócalos, memorias compatibles y fuentes de poder con holgura segura.</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -641,10 +641,10 @@ export default function HomePage() {
                     <Zap className="w-3.5 h-3.5 text-amber-700" /> Consumo y Eficiencia
                   </div>
                   <div className="text-xl font-bold text-slate-900">
-                    {quote.totalTdpWatts}W <span className="text-xs font-normal text-slate-600">Consumo Estimado</span>
+                    {quote.totalTdpWatts > 0 ? `${quote.totalTdpWatts}W` : "Por verificar"} <span className="text-xs font-normal text-slate-600">Consumo Estimado</span>
                   </div>
                   <div className="text-[11px] text-slate-600 mt-1">
-                    Fuente sugerida: {quote.recommendedPsuWatts}W (80 Plus)
+                    Fuente sugerida: {quote.recommendedPsuWatts > 0 ? `${quote.recommendedPsuWatts}W` : "pendiente de cálculo"}
                   </div>
                 </div>
 
