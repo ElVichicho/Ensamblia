@@ -109,7 +109,7 @@ REGLAS ESTRICTAS:
    - Diseño / Edición: Prioriza 32GB+ de RAM, núcleos de CPU y aceleración gráfica.
    - Juegos: Prioriza equilibrio CPU-GPU con alta fluidez.
    - Programación / IA: Prioriza núcleos, RAM y potencia de cómputo.
-2. Utiliza preferentemente los componentes reales del catálogo de SoloTodo listado arriba (con nombres, precios y URLs reales).
+2. Usa EXCLUSIVAMENTE IDs del catálogo. Cada ID debe mantener su categoría, nombre, precio y URL. No uses una GPU como storage. Escoge RAM DIMM de escritorio, no SO-DIMM. Suma todos los precios antes de finalizar.
 3. Precios en Pesos Chilenos (CLP) sin superar el presupuesto máximo.
 4. Comprueba compatibilidad: Zócalo CPU = Placa Madre (AM4, AM5, LGA1700), tipo de RAM soportado (DDR4/DDR5), fuente con más de 30% de holgura.
 5. Incluye cpu, motherboard, ram, storage, psu y case, además de gpu y cooler cuando sean necesarios. Los campos descriptivos deben tener como máximo 20 palabras. No inventes FPS sin mediciones.
@@ -266,6 +266,19 @@ Genera la cotización en JSON para:
       )) {
         throw new Error("La IA devolvió componentes con datos incompletos.");
       }
+      const catalogItems = Object.values(realCatalog.categories).flat();
+      for (const item of parsedQuote.components) {
+        const source = catalogItems.find(product => String(product.id) === String(item.id));
+        if (!source || source.category !== item.category) {
+          throw new Error("La IA seleccionó un producto ajeno al catálogo o con categoría incorrecta.");
+        }
+        item.name = source.name;
+        item.priceCLP = source.priceCLP;
+        item.affiliateUrl = source.solotodoUrl;
+        item.store = source.store;
+      }
+      delete parsedQuote.estimatedFps1080p;
+      delete parsedQuote.estimatedFps1440p;
       const required = ["cpu", "motherboard", "ram", "storage", "psu", "case"];
       if (required.some(category => !parsedQuote.components.some(item => item.category === category))) {
         throw new Error("La IA omitió componentes esenciales del equipo.");

@@ -1,6 +1,6 @@
 {
   "updatedAt": "2026-11-05T19:18:34.441Z",
-  "totalProducts": 200,
+  "totalProducts": 210,
   "categories": {
     "cpu": [
       {
@@ -1311,6 +1311,136 @@
       }
     ],
     "storage": [
+      {
+        "id": 258060,
+        "name": "Airflow Green 256 GB (256GB SATA III 2.5)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 43900,
+        "solotodoUrl": "https://www.solotodo.cl/products/258060",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/1980226_picture_1731904272.jpg"
+      },
+      {
+        "id": 278330,
+        "name": "A-DATA XPG Mars 980 Pro 1 TB (SMAR-980P-1TCI)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 309900,
+        "solotodoUrl": "https://www.solotodo.cl/products/278330",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/2048329"
+      },
+      {
+        "id": 219857,
+        "name": "A-DATA Legend 710 256 GB (ALEG-710-256GCS)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 68590,
+        "solotodoUrl": "https://www.solotodo.cl/products/219857",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/1789502_picture_1690610077.jpg"
+      },
+      {
+        "id": 10497,
+        "name": "Kingston SSDNow KC300 120 GB (SKC300S3B7A/120G)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 29990,
+        "solotodoUrl": "https://www.solotodo.cl/products/10497",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/1024743028.jpg"
+      },
+      {
+        "id": 359271,
+        "name": "Lexar NQ100 256 GB (LNQ100X256G-RNNNG)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 51990,
+        "solotodoUrl": "https://www.solotodo.cl/products/359271",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/1417578_picture_1625598016.jpg"
+      },
+      {
+        "id": 149756,
+        "name": "HP 480 GB (P40502-B21)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 6339990,
+        "solotodoUrl": "https://www.solotodo.cl/products/149756",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/1514275_picture_1640236049.jpg"
+      },
+      {
+        "id": 245655,
+        "name": "Hiksemi Future 1 TB (HS-SSD-FUTURES 2230 1024G)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 219990,
+        "solotodoUrl": "https://www.solotodo.cl/products/245655",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/1919834_picture_1717008311.png"
+      },
+      {
+        "id": 77289,
+        "name": "Crucial BX500 1 TB (CT1000BX500SSD1)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 169900,
+        "solotodoUrl": "https://www.solotodo.cl/products/77289",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/816995_picture_1536947993.jpg"
+      },
+      {
+        "id": 26190,
+        "name": "Kingston SSDNow UV400 120 GB (SUV400S37/120G)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 24990,
+        "solotodoUrl": "https://www.solotodo.cl/products/26190",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/502209_picture_1466079538.jpg"
+      },
+      {
+        "id": 385075,
+        "name": "Dell 480 GB (345-BJSM)",
+        "category": "storage",
+        "categoryLabel": "Almacenamiento",
+        "priceCLP": 499776,
+        "solotodoUrl": "https://www.solotodo.cl/products/385075",
+        "socket": null,
+        "tdp": null,
+        "format": null,
+        "store": "Precio de referencia SoloTodo",
+        "pictureUrl": "https://media.solotodo.com/media/products/2719421_picture_1774332603.png"
+      },
       {
         "id": 235322,
         "name": "Seagate IronWolf Pro 20 TB (ST20000NT001)",
