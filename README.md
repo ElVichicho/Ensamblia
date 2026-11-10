@@ -49,8 +49,6 @@ El proyecto consiste en integrar un **asistente de venta consultiva basado en mo
   * Desglose completo de piezas con precios de tiendas chilenas (*SpDigital, PC Factory, Winpy, Dust2, Infor-Ingen, Central Gamer*).
   * Explicación del criterio de la IA para cada pieza.
   * Botones *"Ver en tienda"* para simular el flujo comercial de SoloTodo.
-* **💬 Asesor Consultivo por Chat en Vivo:**
-  * Permite al usuario dialogar con el asistente para resolver dudas de compatibilidad o solicitar modificaciones sobre su presupuesto actual.
 * **⚡ Resiliencia Doble (OpenRouter + Motor Local de Fallback):**
   * Conexión a OpenRouter con soporte para múltiples LLMs (Gemini 2.0 Flash, Llama 3.3 70B, etc.).
   * Si la clave de API no está presente o falla la red, el sistema activa un **motor inteligente local** para garantizar que la demostración en vivo nunca falle.
@@ -61,7 +59,7 @@ El proyecto consiste en integrar un **asistente de venta consultiva basado en mo
 
 * **Frontend:** [Next.js](https://nextjs.org/) (App Router), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/)
 * **Iconografía:** [Lucide React](https://lucide.dev/)
-* **Backend:** Next.js Route Handlers (`/api/quote`, `/api/chat`)
+* **Backend:** Next.js Route Handlers (`/api/quote`)
 * **Proveedor de IA:** [OpenRouter API](https://openrouter.ai/)
 * **Despliegue:** [Vercel](https://vercel.com/)
 
@@ -102,7 +100,6 @@ solotodo-ai/
 ├── src/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── chat/route.ts      # Endpoint del asesor por chat
 │   │   │   └── quote/route.ts     # Endpoint de cotización y validación
 │   │   ├── globals.css            # Estilos globales y temas
 │   │   ├── layout.tsx             # Layout principal y metadatos

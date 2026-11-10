@@ -19,8 +19,6 @@ import {
   TrendingUp,
   Copy,
   Check,
-  MessageSquare,
-  Send,
   Wifi,
   ChevronDown,
   Briefcase,
@@ -80,17 +78,6 @@ export default function HomePage() {
   const [modelUsed, setModelUsed] = useState<string>("");
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
-  // Estado de Chat consultivo
-  const [chatOpen, setChatOpen] = useState<boolean>(false);
-  const [chatInput, setChatInput] = useState<string>("");
-  const [chatLoading, setChatLoading] = useState<boolean>(false);
-  const [messages, setMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([
-    {
-      sender: "ai",
-      text: "¡Hola! Soy tu Asesor Virtual de SoloTodo. Configura tus preferencias arriba y presiona 'Generar Cotización' para consultar a la IA."
-    }
-  ]);
-
   const generateQuote = async () => {
     setLoading(true);
     setErrorMessage(null);
@@ -138,13 +125,6 @@ export default function HomePage() {
         setQuote(data.quote);
         setModelUsed(data.modelUsed || modelUsed);
         setErrorMessage(null);
-
-        setMessages([
-          {
-            sender: "ai",
-            text: `¡Listo! He diseñado una cotización personalizada para ${data.quote.buildName}. ¿Tienes alguna pregunta o te gustaría ajustar algún componente?`
-          }
-        ]);
       }
     } catch (err: any) {
       console.error("Error al generar cotización:", err);
@@ -152,33 +132,6 @@ export default function HomePage() {
       setQuote(null);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSendChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || chatLoading) return;
-
-    const userMsg = chatInput.trim();
-    setMessages(prev => [...prev, { sender: "user", text: userMsg }]);
-    setChatInput("");
-    setChatLoading(true);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMsg,
-          currentBuild: quote
-        })
-      });
-      const data = await res.json();
-      setMessages(prev => [...prev, { sender: "ai", text: data.reply || data.error || "Sin respuesta del asistente." }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { sender: "ai", text: "Hubo un inconveniente al conectar con el asistente." }]);
-    } finally {
-      setChatLoading(false);
     }
   };
 
@@ -648,14 +601,6 @@ export default function HomePage() {
                     {copiedLink ? <Check className="w-4 h-4 text-emerald-700" /> : <Copy className="w-4 h-4 text-slate-600" />}
                     <span>{copiedLink ? "¡Copiado!" : "Exportar Cotización"}</span>
                   </button>
-
-                  <button
-                    onClick={() => setChatOpen(true)}
-                    className="flex items-center gap-2 text-xs font-semibold bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-lg transition  "
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>Hacer Preguntas al Asesor</span>
-                  </button>
                 </div>
               </div>
 
@@ -721,7 +666,7 @@ export default function HomePage() {
               {/* Justificación del Asesor */}
               <div className="mt-6 p-4 rounded-lg bg-orange-50 border border-orange-500/20 text-sm text-slate-800">
                 <p className="font-semibold text-orange-700 mb-1 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-orange-700" /> Criterio del Asesor con IA:
+                  <Sparkles className="w-4 h-4 text-orange-700" /> Criterio de la cotización
                 </p>
                 <p className="leading-relaxed">{quote.executiveSummary}</p>
               </div>
@@ -844,86 +789,11 @@ export default function HomePage() {
 
       </main>
 
-      {/* Drawer de Chat Consultivo */}
-      {chatOpen && (
-        <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] bg-panel border border-orange-500/30 rounded-lg  flex flex-col h-[480px] overflow-hidden">
-
-          <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></div>
-              <span className="text-xs font-bold text-slate-900">Asesor Virtual SoloTodo (OpenRouter)</span>
-            </div>
-            <button
-              onClick={() => setChatOpen(false)}
-              className="text-slate-600 hover:text-slate-900 text-xs p-1"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-lg px-3.5 py-2.5 ${
-                    m.sender === "user"
-                      ? "bg-orange-600 text-white rounded-br-none"
-                      : "bg-slate-50 text-slate-800 border border-slate-200 rounded-bl-none"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{m.text}</p>
-                </div>
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-slate-50 text-slate-600 px-3 py-2 rounded-lg rounded-bl-none border border-slate-200 flex items-center gap-2">
-                  <div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span>El asesor está escribiendo...</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleSendChat} className="p-3 bg-slate-50 border-t border-slate-200 flex gap-2">
-            <input
-              type="text"
-              placeholder="Haz una pregunta sobre tu computador..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-orange-500"
-            />
-            <button
-              type="submit"
-              disabled={chatLoading}
-              className="p-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
-
-        </div>
-      )}
-
-      {/* Botón flotante para abrir chat */}
-      {!chatOpen && (
-        <button
-          onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 z-40 bg-orange-700 hover:bg-orange-800      text-white p-3.5 rounded-lg   flex items-center gap-2 text-xs font-bold transition transform "
-        >
-          <MessageSquare className="w-5 h-5" />
-          <span className="hidden sm:inline">Consultar al asesor</span>
-        </button>
-      )}
-
       {/* Footer Académico */}
       <footer className="border-t border-slate-200 bg-slate-100 py-6 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-700">SoloTodo AI Assistant</span>
+            <span className="font-bold text-slate-700">SoloTodo AI</span>
             <span>·</span>
             <span>Plataforma Consultiva de Hardware</span>
           </div>
