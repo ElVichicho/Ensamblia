@@ -37,7 +37,7 @@ Enfócate en compatibilidad física, cuellos de botella, fuentes de poder, socke
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey.trim()}`,
-        "HTTP-Referer": "https://solotodo-ai.vercel.app",
+        "HTTP-Referer": "https://solotodo-aiproject.vercel.app",
         "X-Title": "SoloTodo AI Chat",
         "Content-Type": "application/json"
       },

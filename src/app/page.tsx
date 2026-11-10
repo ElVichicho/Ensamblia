@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Cpu,
+  Moon,
+  Sun,
   Layers,
   Gamepad2,
   HardDrive,
@@ -33,6 +35,29 @@ import {
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
 
 export default function HomePage() {
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("solotodo-theme");
+      if (saved === "light" || saved === "dark") {
+        document.documentElement.dataset.theme = saved;
+      }
+    } catch {
+      // The system preference still applies when storage is unavailable.
+    }
+  }, []);
+
+  function toggleTheme() {
+    const root = document.documentElement;
+    const current = root.dataset.theme ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const next = current === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    try {
+      localStorage.setItem("solotodo-theme", next);
+    } catch {
+      // The selected theme still applies to the current page.
+    }
+  }
+
   // Filtros de usuario
   const [budget, setBudget] = useState<number>(800000);
   const [useCase, setUseCase] = useState<BuilderFilters["useCase"]>("office");
@@ -221,7 +246,19 @@ export default function HomePage() {
             <Cpu className="w-6 h-6" aria-hidden="true" />
             <span className="text-xl font-bold">SoloTodo <span className="font-normal">/ Cotizador</span></span>
           </div>
-          <a className="text-sm font-semibold hover:underline" href="https://www.solotodo.cl/">Visitar SoloTodo <span aria-hidden="true">↗</span></a>
+          <div className="flex items-center gap-3">
+            <a className="text-sm font-semibold hover:underline" href="https://www.solotodo.cl/">Visitar SoloTodo <span aria-hidden="true">↗</span></a>
+            <button type="button" onClick={toggleTheme} className="rounded-lg border border-white/50 p-2 hover:bg-white/15">
+              <span className="theme-to-dark">
+                <Moon className="w-5 h-5" aria-hidden="true" />
+                <span className="sr-only">Activar tema oscuro</span>
+              </span>
+              <span className="theme-to-light">
+                <Sun className="w-5 h-5" aria-hidden="true" />
+                <span className="sr-only">Activar tema claro</span>
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -261,7 +298,7 @@ export default function HomePage() {
         </section>
 
         {/* Wizard Consultivo */}
-        <section className="bg-white border border-slate-200 rounded-lg p-6  space-y-8">
+        <section className="bg-panel border border-slate-200 rounded-lg p-6  space-y-8">
 
           {/* PASO 1: PROPÓSITO DEL EQUIPO */}
           <div className="space-y-3">
@@ -545,7 +582,7 @@ export default function HomePage() {
 
         {/* Estado 1: Pantalla de Bienvenida (Antes de cotizar) */}
         {!quote && !loading && !errorMessage && (
-          <section className="bg-white/60 border border-dashed border-slate-200 rounded-lg p-10 text-center space-y-6">
+          <section className="bg-panel/60 border border-dashed border-slate-200 rounded-lg p-10 text-center space-y-6">
             <div className="max-w-lg mx-auto space-y-3">
               <div className="w-16 h-16 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto text-orange-700">
                 <ThumbsUp className="w-8 h-8" />
@@ -577,7 +614,7 @@ export default function HomePage() {
 
         {/* Estado 2: Cargando */}
         {loading && (
-          <section className="bg-white border border-orange-500/30 rounded-lg p-12 text-center space-y-4 ">
+          <section className="bg-panel border border-orange-500/30 rounded-lg p-12 text-center space-y-4 ">
             <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
             <h3 className="text-lg font-bold text-slate-900">Consultando con la Inteligencia Artificial de OpenRouter...</h3>
             <p className="text-xs text-slate-600 max-w-sm mx-auto">
@@ -591,7 +628,7 @@ export default function HomePage() {
           <section className="space-y-6">
 
             {/* Header de Cotización & Resumen */}
-            <div className="bg-white border border-slate-200 rounded-lg p-6 ">
+            <div className="bg-panel border border-slate-200 rounded-lg p-6 ">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -722,7 +759,7 @@ export default function HomePage() {
                 {quote.components.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white border border-slate-200 hover:border-orange-500/50 rounded-lg p-5 transition flex flex-col justify-between  group"
+                    className="bg-panel border border-slate-200 hover:border-orange-500/50 rounded-lg p-5 transition flex flex-col justify-between  group"
                   >
                     <div>
                       {/* Cabecera del componente */}
@@ -809,7 +846,7 @@ export default function HomePage() {
 
       {/* Drawer de Chat Consultivo */}
       {chatOpen && (
-        <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] bg-white border border-orange-500/30 rounded-lg  flex flex-col h-[480px] overflow-hidden">
+        <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] bg-panel border border-orange-500/30 rounded-lg  flex flex-col h-[480px] overflow-hidden">
 
           <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">

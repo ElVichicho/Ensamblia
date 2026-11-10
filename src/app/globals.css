@@ -17,3 +17,89 @@ body {
 .catalog-header :focus-visible {
   outline-color: white;
 }
+
+
+@theme inline {
+  --color-panel: var(--panel);
+}
+
+:root {
+  color-scheme: light;
+  --panel: #fff;
+}
+
+.theme-to-light {
+  display: none;
+}
+
+@custom-variant night {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme]), :root:not([data-theme]) *) {
+      @slot;
+    }
+  }
+}
+
+:root {
+  @variant night {
+    color-scheme: dark;
+    --panel: #17212e;
+    --color-slate-50: #202d3d;
+    --color-slate-100: #101822;
+    --color-slate-200: #39485a;
+    --color-slate-500: #a1afc1;
+    --color-slate-600: #bac5d3;
+    --color-slate-700: #cbd5e1;
+    --color-slate-800: #e2e8f0;
+    --color-slate-900: #f1f5f9;
+    --color-orange-50: #38251b;
+    --color-red-50: #351d24;
+    --color-red-100: #45232c;
+  }
+}
+
+:is(.text-orange-700, .text-orange-500, .text-amber-700, .text-amber-500) {
+  @variant night {
+    color: #fdba74;
+  }
+}
+
+.text-emerald-700 {
+  @variant night {
+    color: #6ee7b7;
+  }
+}
+
+.text-red-800 {
+  @variant night {
+    color: #fecaca;
+  }
+}
+
+.text-cyan-700 {
+  @variant night {
+    color: #67e8f9;
+  }
+}
+
+.text-purple-700 {
+  @variant night {
+    color: #d8b4fe;
+  }
+}
+
+.theme-to-dark {
+  @variant night {
+    display: none;
+  }
+}
+
+.theme-to-light {
+  @variant night {
+    display: inline;
+  }
+}

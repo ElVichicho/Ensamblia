@@ -171,7 +171,7 @@ Genera la cotización en JSON para:
         method: "POST",
         headers: {
           Authorization: `Bearer ${token.trim()}`,
-          "HTTP-Referer": "https://solotodo-ai.vercel.app",
+          "HTTP-Referer": "https://solotodo-aiproject.vercel.app",
           "X-Title": "SoloTodo AI PC Builder",
           "Content-Type": "application/json",
         },
