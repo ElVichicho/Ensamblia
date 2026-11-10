@@ -1,7 +1,7 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
 import realCatalog from "@/data/solotodo-catalog.json";
 
-export const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
+export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3.5-lightning:free";
 
 export const OPENROUTER_RATE_LIMIT_MESSAGE =
   "OpenRouter alcanzó el límite temporal de uso gratuito. Espera antes de volver a intentar.";
@@ -30,19 +30,19 @@ function getSampleCatalogContext(budget: number): string {
     // CPUs
     summary += "PROCESADORES (CPUs):\n";
     (cats.cpu || []).slice(0, 10).forEach(c => {
-      summary += `- [ID:${c.id}] ${c.name} | $${c.priceCLP} CLP | Socket: ${c.socket || "N/A"} | TDP: ${c.tdp || "65"}W | URL: ${c.solotodoUrl}\n`;
+      summary += `- [ID:${c.id}] ${c.name} | $${c.priceCLP} CLP | Socket: ${c.socket || "N/A"} | TDP: ${c.tdp ?? "desconocido"}W | URL: ${c.solotodoUrl}\n`;
     });
 
     // Motherboards
     summary += "\nPLACAS MADRE:\n";
     (cats.motherboard || []).slice(0, 10).forEach(m => {
-      summary += `- [ID:${m.id}] ${m.name} | $${m.priceCLP} CLP | Socket: ${m.socket || "N/A"} | Formato: ${m.format || "mATX"} | URL: ${m.solotodoUrl}\n`;
+      summary += `- [ID:${m.id}] ${m.name} | $${m.priceCLP} CLP | Socket: ${m.socket || "N/A"} | Formato: ${m.format || "desconocido"} | URL: ${m.solotodoUrl}\n`;
     });
 
     // GPUs
     summary += "\nTARJETAS DE VIDEO (GPUs):\n";
     (cats.gpu || []).slice(0, 8).forEach(g => {
-      summary += `- [ID:${g.id}] ${g.name} | $${g.priceCLP} CLP | TDP: ${g.tdp || "150"}W | URL: ${g.solotodoUrl}\n`;
+      summary += `- [ID:${g.id}] ${g.name} | $${g.priceCLP} CLP | TDP: ${g.tdp ?? "desconocido"}W | URL: ${g.solotodoUrl}\n`;
     });
 
     // RAM
@@ -99,7 +99,7 @@ export async function requestBuildFromOpenRouter(
 
   const instructions = `
 Eres el Asistente Experto y Asesor Virtual de Hardware para SoloTodo (Chile).
-Diseña la cotización de computador más equilibrada, confiable y 100% libre de errores de compatibilidad física para el mercado chileno.
+Diseña una cotización equilibrada para el mercado chileno. Señala con status warning cualquier compatibilidad que los datos no permitan verificar.
 
 ${catalogContext}
 
@@ -111,8 +111,9 @@ REGLAS ESTRICTAS:
    - Programación / IA: Prioriza núcleos, RAM y potencia de cómputo.
 2. Utiliza preferentemente los componentes reales del catálogo de SoloTodo listado arriba (con nombres, precios y URLs reales).
 3. Precios en Pesos Chilenos (CLP) sin superar el presupuesto máximo.
-4. Compatibilidad 100%: Zócalo CPU = Placa Madre (AM4, AM5, LGA1700), tipo de RAM soportado (DDR4/DDR5), fuente con más de 30% de holgura.
-5. FORMATO DE SALIDA: Debes responder ÚNICAMENTE con el objeto JSON válido. NO agregues texto fuera del JSON. Usa una frase breve por campo descriptivo.
+4. Comprueba compatibilidad: Zócalo CPU = Placa Madre (AM4, AM5, LGA1700), tipo de RAM soportado (DDR4/DDR5), fuente con más de 30% de holgura.
+5. Incluye cpu, motherboard, ram, storage, psu y case, además de gpu y cooler cuando sean necesarios. Los campos descriptivos deben tener como máximo 20 palabras. No inventes FPS sin mediciones.
+6. FORMATO DE SALIDA: Debes responder ÚNICAMENTE con el objeto JSON válido. NO agregues texto fuera del JSON. Usa una frase breve por campo descriptivo.
 
 Estructura JSON requerida:
 {
@@ -125,7 +126,7 @@ Estructura JSON requerida:
   "estimatedFps1440p": number,
   "totalTdpWatts": number,
   "recommendedPsuWatts": number,
-  "compatibilityScore": 100,
+  "compatibilityScore": number,
   "executiveSummary": "string",
   "pros": ["string", "string", "string"],
   "upgradePath": "string",
@@ -166,7 +167,7 @@ Genera la cotización en JSON para:
 - Instrucciones especiales: ${filters.customInstructions || 'Ninguna'}
 `;
 
-  const modelsToTry = [...new Set([modelName, DEFAULT_OPENROUTER_MODEL])];
+  const modelsToTry = [modelName];
   let lastError = "";
 
   for (const currentModel of modelsToTry) {
@@ -189,10 +190,13 @@ Genera la cotización en JSON para:
           temperature: 0.2,
           max_tokens: 3200,
           ...(currentModel === DEFAULT_OPENROUTER_MODEL && {
+            reasoning: { enabled: false },
+          }),
+          ...(currentModel === "openrouter/free" && {
             response_format: { type: "json_object" },
           }),
         }),
-        signal: AbortSignal.timeout(18000),
+        signal: AbortSignal.timeout(45000),
       });
       const rawResponseText = await response.text();
 
@@ -220,6 +224,9 @@ Genera la cotización en JSON para:
         continue;
       }
 
+      if (data.choices?.[0]?.finish_reason === "length") {
+        throw new Error("La IA agotó el límite de salida antes de completar la cotización.");
+      }
       const content = data.choices?.[0]?.message?.content;
 
       if (!content || content.trim() === "") {
@@ -237,10 +244,36 @@ Genera la cotización en JSON para:
 
       const parsedQuote: BuildQuote = JSON.parse(jsonMatch[0]);
 
-      // Validar que tenga componentes
-      if (!parsedQuote.components || parsedQuote.components.length === 0) {
+      // Reject partial responses before passing them to the UI.
+      if (!Array.isArray(parsedQuote.components) || parsedQuote.components.length === 0) {
         lastError = "El JSON generado no contiene lista de componentes.";
         continue;
+      }
+
+      const textFields = ["buildName", "targetUse", "performanceSummary", "executiveSummary", "upgradePath"] as const;
+      const numericFields = ["totalBudgetCLP", "actualCostCLP", "totalTdpWatts", "recommendedPsuWatts", "compatibilityScore"] as const;
+      if (textFields.some(key => typeof parsedQuote[key] !== "string") ||
+          numericFields.some(key => !Number.isFinite(parsedQuote[key])) ||
+          !Array.isArray(parsedQuote.pros) ||
+          !Array.isArray(parsedQuote.compatibilityChecks)) {
+        throw new Error("La cotización de la IA está incompleta.");
+      }
+      if (parsedQuote.components.some(item =>
+        !item || !["cpu", "motherboard", "ram", "gpu", "storage", "psu", "case", "cooler"].includes(item.category) ||
+        !Number.isFinite(item.priceCLP) || item.priceCLP <= 0 ||
+        ["id", "categoryLabel", "name", "brand", "specs", "store", "affiliateUrl", "aiReason", "compatibilityNote"]
+          .some(key => typeof item[key as keyof typeof item] !== "string")
+      )) {
+        throw new Error("La IA devolvió componentes con datos incompletos.");
+      }
+      const required = ["cpu", "motherboard", "ram", "storage", "psu", "case"];
+      if (required.some(category => !parsedQuote.components.some(item => item.category === category))) {
+        throw new Error("La IA omitió componentes esenciales del equipo.");
+      }
+      parsedQuote.actualCostCLP = parsedQuote.components.reduce((sum, item) => sum + item.priceCLP, 0);
+      parsedQuote.totalBudgetCLP = filters.budgetCLP;
+      if (parsedQuote.actualCostCLP > filters.budgetCLP) {
+        throw new Error("La cotización de la IA supera el presupuesto solicitado.");
       }
 
       return {
@@ -252,7 +285,7 @@ Genera la cotización en JSON para:
         throw err;
       }
       if (err.name === "TimeoutError") {
-        lastError = `Tiempo de espera agotado con ${currentModel} (más de 18s).`;
+        lastError = `Tiempo de espera agotado con ${currentModel} (más de 45s).`;
       } else {
         lastError = err.message || String(err);
       }
