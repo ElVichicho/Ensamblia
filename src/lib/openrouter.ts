@@ -1,6 +1,8 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
 import realCatalog from "@/data/solotodo-catalog.json";
 
+export const DEFAULT_OPENROUTER_MODEL = "google/gemini-3.1-flash-lite";
+
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 function getSampleCatalogContext(budget: number): string {
@@ -75,7 +77,7 @@ function getSampleCatalogContext(budget: number): string {
 export async function requestBuildFromOpenRouter(
   filters: BuilderFilters,
   apiKey?: string,
-  modelName: string = "google/gemma-4-31b-it:free"
+  modelName = DEFAULT_OPENROUTER_MODEL
 ): Promise<{ quote: BuildQuote; modelUsed: string }> {
   const token = apiKey || process.env.OPENROUTER_API_KEY;
 
@@ -102,7 +104,7 @@ REGLAS ESTRICTAS:
 2. Utiliza preferentemente los componentes reales del catálogo de SoloTodo listado arriba (con nombres, precios y URLs reales).
 3. Precios en Pesos Chilenos (CLP) sin superar el presupuesto máximo.
 4. Compatibilidad 100%: Zócalo CPU = Placa Madre (AM4, AM5, LGA1700), tipo de RAM soportado (DDR4/DDR5), fuente con más de 30% de holgura.
-5. FORMATO DE SALIDA: Debes responder ÚNICAMENTE con el objeto JSON válido. NO agregues introducciones, comentarios ni texto fuera del JSON.
+5. FORMATO DE SALIDA: Debes responder ÚNICAMENTE con el objeto JSON válido. NO agregues texto fuera del JSON. Usa una frase breve por campo descriptivo.
 
 Estructura JSON requerida:
 {
@@ -156,53 +158,59 @@ Genera la cotización en JSON para:
 - Instrucciones especiales: ${filters.customInstructions || 'Ninguna'}
 `;
 
-  // Modelos a intentar en caso de rate-limit en la capa gratuita
-  const modelsToTry = [
-    modelName,
-    "google/gemma-4-31b-it:free",
-    "nvidia/nemotron-3.5-lightning:free",
-    "cohere/north-mini-code:free"
-  ].filter((v, i, a) => a.indexOf(v) === i); // Deduplicar
-
+  const modelsToTry = [...new Set([modelName, DEFAULT_OPENROUTER_MODEL])];
   let lastError = "";
 
   for (const currentModel of modelsToTry) {
     try {
       console.log(`Intentando consulta con modelo: ${currentModel}...`);
 
-      // Nota: Para compatibilidad universal (especialmente con Gemma y Nemotron),
-      // fusionamos las instrucciones en el mensaje de usuario para evitar errores de provider con 'role: system'.
       const fullPrompt = `${instructions}\n\n---\nSOLICITUD DEL USUARIO:\n${userPrompt}`;
 
       const response = await fetch(OPENROUTER_API_URL, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token.trim()}`,
+          Authorization: `Bearer ${token.trim()}`,
           "HTTP-Referer": "https://solotodo-ai.vercel.app",
           "X-Title": "SoloTodo AI PC Builder",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           model: currentModel,
-          messages: [
-            { role: "user", content: fullPrompt }
-          ],
-          temperature: 0.2
-        })
+          messages: [{ role: "user", content: fullPrompt }],
+          temperature: 0.2,
+          max_tokens: 3200,
+          ...(currentModel === DEFAULT_OPENROUTER_MODEL && {
+            reasoning: { effort: "minimal" },
+            response_format: { type: "json_object" },
+          }),
+        }),
+        signal: AbortSignal.timeout(18000),
       });
+      const rawResponseText = await response.text();
 
       if (!response.ok) {
-        const errText = await response.text();
-        console.error(`Error en OpenRouter con ${currentModel} (${response.status}):`, errText);
-        lastError = `OpenRouter (${response.status}): ${errText}`;
-        // Si es 401 (clave inválida), no tiene sentido seguir reintentando con otros modelos
+        console.error(`Error en OpenRouter con ${currentModel} (${response.status}):`, rawResponseText);
+        lastError = `OpenRouter (${response.status}): ${rawResponseText.slice(0, 200)}`;
         if (response.status === 401) {
-          throw new Error(`Clave de OpenRouter no válida (401 Unauthorized): ${errText}`);
+          throw new Error(`Clave de OpenRouter no válida (401 Unauthorized): ${rawResponseText}`);
         }
         continue;
       }
 
-      const data = await response.json();
+      let data: any;
+      try {
+        data = JSON.parse(rawResponseText);
+      } catch {
+        lastError = `El proveedor envió texto en vez de JSON: ${rawResponseText.slice(0, 150)}`;
+        continue;
+      }
+
+      if (data.error) {
+        lastError = `Error de API: ${data.error.message || JSON.stringify(data.error)}`;
+        continue;
+      }
+
       const content = data.choices?.[0]?.message?.content;
 
       if (!content || content.trim() === "") {
@@ -214,7 +222,7 @@ Genera la cotización en JSON para:
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error("No se encontró JSON válido en el texto devuelto:", content);
-        lastError = "La IA no devolvió un JSON válido.";
+        lastError = "La IA no devolvió un JSON con la estructura esperada.";
         continue;
       }
 
@@ -234,7 +242,11 @@ Genera la cotización en JSON para:
       if (err.message && err.message.includes("401")) {
         throw err;
       }
-      lastError = err.message || String(err);
+      if (err.name === "TimeoutError") {
+        lastError = `Tiempo de espera agotado con ${currentModel} (más de 18s).`;
+      } else {
+        lastError = err.message || String(err);
+      }
     }
   }
 

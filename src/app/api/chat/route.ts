@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { DEFAULT_OPENROUTER_MODEL } from "@/lib/openrouter";
+
+export const maxDuration = 60;
+
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export async function POST(req: NextRequest) {
@@ -8,7 +12,7 @@ export async function POST(req: NextRequest) {
     const { message, currentBuild } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free";
+    const model = process.env.OPENROUTER_MODEL?.trim() || DEFAULT_OPENROUTER_MODEL;
 
     if (!message) {
       return NextResponse.json({ error: "Mensaje requerido" }, { status: 400 });
@@ -42,14 +46,17 @@ Enfócate en compatibilidad física, cuellos de botella, fuentes de poder, socke
         messages: [
           { role: "user", content: fullPrompt }
         ],
-        temperature: 0.5
-      })
+        temperature: 0.5,
+        max_tokens: 450,
+        ...(model === DEFAULT_OPENROUTER_MODEL && { reasoning: { effort: "minimal" } })
+      }),
+      signal: AbortSignal.timeout(12000),
     });
 
     if (!response.ok) {
-      const errText = await response.text();
+      console.error("OpenRouter chat:", response.status);
       return NextResponse.json({
-        reply: `Aviso del asesor: La API de OpenRouter respondió con error (${response.status}): ${errText}`
+        reply: `Aviso del asesor: La API de OpenRouter respondió con error (${response.status})`
       });
     }
 
@@ -57,8 +64,11 @@ Enfócate en compatibilidad física, cuellos de botella, fuentes de poder, socke
     const reply = data.choices?.[0]?.message?.content || "No se obtuvo respuesta del modelo.";
 
     return NextResponse.json({ reply });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      return NextResponse.json({ reply: "El asesor tardó demasiado. Puedes volver a enviar tu consulta." });
+    }
     console.error("Error en /api/chat:", error);
-    return NextResponse.json({ error: error.message || "Error interno del asesor de chat" }, { status: 500 });
+    return NextResponse.json({ error: "Error interno del asesor de chat" }, { status: 500 });
   }
 }
