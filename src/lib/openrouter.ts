@@ -167,7 +167,9 @@ Genera la cotización en JSON para:
 - Instrucciones especiales: ${filters.customInstructions || 'Ninguna'}
 `;
 
-  const modelsToTry = [modelName];
+  const modelsToTry = [modelName, modelName];
+  const deadline = Date.now() + 50000;
+  let previousContent = "";
   let lastError = "";
 
   for (const currentModel of modelsToTry) {
@@ -186,7 +188,13 @@ Genera la cotización en JSON para:
         },
         body: JSON.stringify({
           model: currentModel,
-          messages: [{ role: "user", content: fullPrompt }],
+          messages: [
+            { role: "user", content: fullPrompt },
+            ...(previousContent ? [
+              { role: "assistant", content: previousContent },
+              { role: "user", content: `Corrige el JSON completo. Error detectado: ${lastError}. Copia los IDs EXACTOS de la categoría correspondiente del catálogo y respeta el presupuesto.` },
+            ] : []),
+          ],
           temperature: 0.2,
           max_tokens: 3200,
           ...(currentModel === DEFAULT_OPENROUTER_MODEL && {
@@ -196,7 +204,7 @@ Genera la cotización en JSON para:
             response_format: { type: "json_object" },
           }),
         }),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(Math.max(1, Math.min(45000, deadline - Date.now()))),
       });
       const rawResponseText = await response.text();
 
@@ -234,6 +242,8 @@ Genera la cotización en JSON para:
         continue;
       }
 
+      previousContent = content;
+
       // Extraer bloque JSON con expresión regular segura
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -270,7 +280,7 @@ Genera la cotización en JSON para:
       for (const item of parsedQuote.components) {
         const source = catalogItems.find(product => String(product.id) === String(item.id));
         if (!source || source.category !== item.category) {
-          throw new Error("La IA seleccionó un producto ajeno al catálogo o con categoría incorrecta.");
+          throw new Error(`Producto inválido: ID ${item.id} como ${item.category}. Selecciona otro ID exacto de esa categoría.`);
         }
         item.name = source.name;
         item.priceCLP = source.priceCLP;
@@ -298,6 +308,7 @@ Genera la cotización en JSON para:
       if (err.message === OPENROUTER_RATE_LIMIT_MESSAGE || err.message?.includes("401")) {
         throw err;
       }
+      if (Date.now() >= deadline) throw new Error("Se agotó el tiempo disponible para generar la cotización.");
       if (err.name === "TimeoutError") {
         lastError = `Tiempo de espera agotado con ${currentModel} (más de 45s).`;
       } else {
