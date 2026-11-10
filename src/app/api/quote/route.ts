@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BuilderFilters } from "@/types/pc-builder";
-import { DEFAULT_OPENROUTER_MODEL, requestBuildFromOpenRouter } from "@/lib/openrouter";
+import { getFreeOpenRouterModel, OPENROUTER_RATE_LIMIT_MESSAGE, requestBuildFromOpenRouter } from "@/lib/openrouter";
 
 // Permitir hasta 60 segundos de ejecución en Vercel Serverless Function
 export const maxDuration = 60;
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     // Obtener clave del servidor (Vercel)
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = process.env.OPENROUTER_MODEL?.trim() || DEFAULT_OPENROUTER_MODEL;
+    const model = getFreeOpenRouterModel();
 
     if (!filters || !filters.budgetCLP) {
       return NextResponse.json(
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     console.error("Error en API /api/quote:", error);
     return NextResponse.json(
       { error: error.message || "Error al conectar con la API de OpenRouter" },
-      { status: 502 }
+      { status: error.message === OPENROUTER_RATE_LIMIT_MESSAGE ? 429 : 502 }
     );
   }
 }

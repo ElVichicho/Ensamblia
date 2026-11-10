@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { DEFAULT_OPENROUTER_MODEL } from "@/lib/openrouter";
+import { getFreeOpenRouterModel, OPENROUTER_RATE_LIMIT_MESSAGE } from "@/lib/openrouter";
 
 export const maxDuration = 60;
 
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const { message, currentBuild } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = process.env.OPENROUTER_MODEL?.trim() || DEFAULT_OPENROUTER_MODEL;
+    const model = getFreeOpenRouterModel();
 
     if (!message) {
       return NextResponse.json({ error: "Mensaje requerido" }, { status: 400 });
@@ -48,10 +48,17 @@ Enfócate en compatibilidad física, cuellos de botella, fuentes de poder, socke
         ],
         temperature: 0.5,
         max_tokens: 450,
-        ...(model === DEFAULT_OPENROUTER_MODEL && { reasoning: { effort: "minimal" } })
       }),
       signal: AbortSignal.timeout(12000),
     });
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("Retry-After");
+      return NextResponse.json({ reply: OPENROUTER_RATE_LIMIT_MESSAGE }, {
+        status: 429,
+        headers: retryAfter ? { "Retry-After": retryAfter } : undefined,
+      });
+    }
 
     if (!response.ok) {
       console.error("OpenRouter chat:", response.status);

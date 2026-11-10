@@ -1,7 +1,15 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
 import realCatalog from "@/data/solotodo-catalog.json";
 
-export const DEFAULT_OPENROUTER_MODEL = "google/gemini-3.1-flash-lite";
+export const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
+
+export const OPENROUTER_RATE_LIMIT_MESSAGE =
+  "OpenRouter alcanzó el límite temporal de uso gratuito. Espera antes de volver a intentar.";
+
+export function getFreeOpenRouterModel() {
+  const configured = process.env.OPENROUTER_MODEL?.trim();
+  return configured?.endsWith(":free") ? configured : DEFAULT_OPENROUTER_MODEL;
+}
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -181,13 +189,14 @@ Genera la cotización en JSON para:
           temperature: 0.2,
           max_tokens: 3200,
           ...(currentModel === DEFAULT_OPENROUTER_MODEL && {
-            reasoning: { effort: "minimal" },
             response_format: { type: "json_object" },
           }),
         }),
         signal: AbortSignal.timeout(18000),
       });
       const rawResponseText = await response.text();
+
+      if (response.status === 429) throw new Error(OPENROUTER_RATE_LIMIT_MESSAGE);
 
       if (!response.ok) {
         console.error(`Error en OpenRouter con ${currentModel} (${response.status}):`, rawResponseText);
@@ -236,10 +245,10 @@ Genera la cotización en JSON para:
 
       return {
         quote: parsedQuote,
-        modelUsed: currentModel
+        modelUsed: data.model || currentModel
       };
     } catch (err: any) {
-      if (err.message && err.message.includes("401")) {
+      if (err.message === OPENROUTER_RATE_LIMIT_MESSAGE || err.message?.includes("401")) {
         throw err;
       }
       if (err.name === "TimeoutError") {
