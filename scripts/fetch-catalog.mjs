@@ -1,126 +1,51 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const output = fileURLToPath(new URL("../src/data/solotodo-catalog.json", import.meta.url));
+const categories = [[3,"cpu"],[5,"motherboard"],[7,"ram"],[2,"gpu"],[39,"storage"],[9,"psu"],[10,"case"],[12,"cooler"]];
 
-const CATEGORIES = [
-  { id: 3, key: 'cpu', label: 'Procesadores' },
-  { id: 5, key: 'motherboard', label: 'Placas madre' },
-  { id: 7, key: 'ram', label: 'Memorias RAM' },
-  { id: 2, key: 'gpu', label: 'Tarjetas de video' },
-  { id: 8, key: 'storage', label: 'Almacenamiento' },
-  { id: 9, key: 'psu', label: 'Fuentes de poder' },
-  { id: 10, key: 'case', label: 'Gabinetes' },
-  { id: 12, key: 'cooler', label: 'Coolers de CPU' }
-];
+function compact(value) {
+  if (Array.isArray(value)) return value.map(compact);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value)
+      .filter(([key]) => !key.endsWith("_id") && !key.endsWith("_unicode") && !["id","unicode","picture","default_bucket"].includes(key))
+      .map(([key,item]) => [key,compact(item)]));
+  }
+  return value;
+}
 
-const ITEMS_PER_CATEGORY = 25;
-
-async function fetchCategory(category) {
-  const url = `https://publicapi.solotodo.com/products/browse/?categories=${category.id}&page_size=${ITEMS_PER_CATEGORY}`;
-  console.log(`📦 Consultando categoría: ${category.label} (ID: ${category.id})...`);
-
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-
-    if (!res.ok) {
-      console.error(`❌ Error HTTP ${res.status} al consultar ${category.label}`);
-      return [];
-    }
-
-    const data = await res.json();
-    const entries = data.results || [];
-
-    const products = [];
-    for (const entry of entries) {
-      const prodEntry = entry.product_entries?.[0];
-      if (!prodEntry) continue;
-
-      const p = prodEntry.product;
-      const meta = prodEntry.metadata;
-      const priceCLP = meta?.prices_per_currency?.[0]?.offer_price || meta?.prices_per_currency?.[0]?.normal_price || 0;
-
-      // Extraer socket o datos clave
-      const socket = p.specs?.chipset_northbridge_family_socket_socket_name ||
-                     p.specs?.socket_name ||
-                     p.specs?.socket_socket_name ||
-                     null;
-
-      const tdp = p.specs?.tdp || null;
-      const format = p.specs?.format_format_name || p.specs?.format_name || null;
-
-      // Tienda con mejor precio (si está disponible en metadata)
-      const storeName = meta?.best_store_name || meta?.min_store_name || 'Tienda Asociada SoloTodo';
-
-      products.push({
-        id: p.id,
-        name: p.name,
-        category: category.key,
-        categoryLabel: category.label,
-        priceCLP: Math.round(priceCLP),
-        solotodoUrl: `https://www.solotodo.cl/products/${p.id}`,
-        socket,
-        tdp,
-        format,
-        store: storeName,
-        pictureUrl: p.picture ? `https://media.solotodo.com/${p.picture}` : null
+const catalog = { updatedAt: new Date().toISOString(), totalProducts: 0, categories: {} };
+for (const [id,category] of categories) {
+  const response = await fetch(
+    `https://publicapi.solotodo.com/products/browse/?categories=${id}&page_size=50`,
+    { signal: AbortSignal.timeout(30000), headers: { "User-Agent": "SoloTodo-Academic-Catalog/1.0" } },
+  );
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${category}. El catálogo anterior se conserva.`);
+  const data = await response.json();
+  const records = new Map();
+  for (const entry of data.results) {
+    for (const {product:p,metadata:m} of entry.product_entries || []) {
+      const s=p.specs||{};
+      const price=m?.prices_per_currency?.find(item=>JSON.stringify(item).includes("CLP"))||m?.prices_per_currency?.[0];
+      const priceCLP=Math.round(price?.offer_price||price?.normal_price||0);
+      if (!priceCLP || p.category_id!==id) continue;
+      records.set(p.id, {
+        id:p.id, name:p.name, category, categoryLabel:category, brand:p.brand?.name||null,
+        priceCLP, solotodoUrl:`https://www.solotodo.cl/products/${p.id}`,
+        socket:s.chipset_northbridge_family_socket_socket_name||s.socket_name||s.socket_socket_name||null,
+        tdp:s.tdp||null, format:s.format_format_name||s.format_name||null,
+        store:"Precio de referencia SoloTodo", pictureUrl:p.picture_url||null, specs:compact(s),
       });
     }
-
-    console.log(`✅ ${category.label}: ${products.length} productos obtenidos.`);
-    return products;
-  } catch (err) {
-    console.error(`❌ Error de red en ${category.label}:`, err.message);
-    return [];
   }
+  if (!records.size) throw new Error(`Sin productos con precio para ${category}. El catálogo anterior se conserva.`);
+  catalog.categories[category]=[...records.values()];
+  catalog.totalProducts+=records.size;
+  console.log(category, records.size);
+  await new Promise(resolve=>setTimeout(resolve,750));
 }
-
-async function main() {
-  console.log('🚀 Iniciando extracción de catálogo real desde publicapi.solotodo.com...\n');
-  
-  const catalog = {
-    updatedAt: new Date().toISOString(),
-    totalProducts: 0,
-    categories: {}
-  };
-
-  let allProducts = [];
-
-  for (const cat of CATEGORIES) {
-    const items = await fetchCategory(cat);
-    catalog.categories[cat.key] = items;
-    allProducts = allProducts.concat(items);
-    // Pausa breve para ser gentiles con la API
-    await new Promise(r => setTimeout(r, 600));
-  }
-
-  catalog.totalProducts = allProducts.length;
-
-  // Directorio de salida dentro del proyecto Next.js
-  const outputDir = path.resolve(__dirname, '../src/data');
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  const outputPath = path.join(outputDir, 'solotodo-catalog.json');
-  const jsonContent = JSON.stringify(catalog, null, 2);
-  fs.writeFileSync(outputPath, jsonContent, 'utf-8');
-
-  const stats = fs.statSync(outputPath);
-  const sizeKB = (stats.size / 1024).toFixed(2);
-
-  console.log('\n=============================================');
-  console.log(`🎉 ¡Catálogo generado exitosamente!`);
-  console.log(`📁 Archivo: ${outputPath}`);
-  console.log(`📊 Total de componentes extraídos: ${catalog.totalProducts}`);
-  console.log(`⚖️ Peso del archivo JSON: ${sizeKB} KB (${stats.size} bytes)`);
-  console.log('=============================================');
-}
-
-main();
+await fs.mkdir(path.dirname(output),{recursive:true});
+await fs.writeFile(output+".tmp", JSON.stringify(catalog,null,2)+"\n");
+await fs.rename(output+".tmp",output);
+console.log(`Catálogo actualizado: ${catalog.totalProducts} productos.`);

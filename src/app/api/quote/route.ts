@@ -1,37 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BuilderFilters } from "@/types/pc-builder";
-import { getFreeOpenRouterModel, OPENROUTER_RATE_LIMIT_MESSAGE, requestBuildFromOpenRouter } from "@/lib/openrouter";
+import { getFreeOpenRouterModel, requestBuildFromOpenRouter } from "@/lib/openrouter";
+import { QuoteError } from "@/lib/quote-selection";
 
-// Permitir hasta 60 segundos de ejecución en Vercel Serverless Function
 export const maxDuration = 60;
-
 export async function POST(req: NextRequest) {
+  let body;
+  try { body=await req.json(); }
+  catch { return NextResponse.json({error:"La solicitud debe contener JSON válido."},{status:400}); }
+  const filters: BuilderFilters=body?.filters;
+  const options: Record<string, string[]> = {
+    useCase:["office","home_study","creative","gaming","dev_data"], cpuPreference:["any","amd","intel"],
+    gpuPreference:["any","nvidia","amd"], storageCapacity:["500gb","1tb","2tb","any"],
+    storageType:["nvme","sata","any"], ramCapacity:["16gb","32gb","64gb","any"],
+    coolingPreference:["air","liquid","any"], caseSize:["compact","standard","any"],
+  };
+  if (!filters || !Number.isFinite(filters.budgetCLP) || filters.budgetCLP<350000 || filters.budgetCLP>3000000 ||
+      Object.entries(options).some(([key,values])=>!values.includes(filters[key as keyof BuilderFilters] as string)) ||
+      typeof filters.wifiRequired!=="boolean" ||
+      (filters.customInstructions!==undefined && (typeof filters.customInstructions!=="string"||filters.customInstructions.length>1000))) {
+    return NextResponse.json({error:"Revisa el presupuesto y las preferencias de la cotización."},{status:400});
+  }
   try {
-    const body = await req.json();
-    const filters: BuilderFilters = body.filters;
-
-    // Obtener clave del servidor (Vercel)
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = getFreeOpenRouterModel();
-
-    if (!filters || !filters.budgetCLP) {
-      return NextResponse.json(
-        { error: "Presupuesto no especificado" },
-        { status: 400 }
-      );
-    }
-
-    const result = await requestBuildFromOpenRouter(filters, apiKey, model);
-
-    return NextResponse.json({
-      quote: result.quote,
-      modelUsed: result.modelUsed
-    });
-  } catch (error: any) {
-    console.error("Error en API /api/quote:", error);
-    return NextResponse.json(
-      { error: error.message || "Error al conectar con la API de OpenRouter" },
-      { status: error.message === OPENROUTER_RATE_LIMIT_MESSAGE ? 429 : 502 }
-    );
+    return NextResponse.json(await requestBuildFromOpenRouter(filters,process.env.OPENROUTER_API_KEY,getFreeOpenRouterModel()));
+  } catch (error) {
+    console.error("Cotización:",error);
+    return NextResponse.json({error:error instanceof QuoteError?error.message:"Ocurrió un error al preparar la cotización."},
+      {status:error instanceof QuoteError?error.status:500});
   }
 }

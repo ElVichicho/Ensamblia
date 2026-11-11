@@ -16,6 +16,7 @@ export interface ComponentItem {
   brand: string;
   specs: string;
   priceCLP: number;
+  quantity?: number;
   store: string;
   storeUrl?: string;
   affiliateUrl: string;
