@@ -53,3 +53,16 @@ assert.throws(()=>createQuote(JSON.stringify(response),{...base,budgetCLP:80000}
 assert.throws(()=>createQuote(JSON.stringify({...response,components:{...selection,cpu:{id:999,reason:"Unknown"}}}),base,fixture),/inválido/);
 console.log("Passed budget candidate diversity, specifications, quantities, duplicate IDs, RAM, budget and unknown product checks.");
 
+
+const { prepareConfigurations } = module.exports;
+for (const [budget,useCase] of [[800000,"office"],[1000000,"gaming"],[2200000,"gaming"]]) {
+  const filters={...base,budgetCLP:budget,useCase};
+  const options=prepareConfigurations(filters,selectCandidates(filters));
+  assert(options.length>0,`Expected feasible configurations for ${budget} ${useCase}`);
+  assert(options.every(option=>option.quote.actualCostCLP<=budget));
+  console.log(budget,useCase,options.length,options[0].quote.actualCostCLP,options[0].quote.components.find(p=>p.category==="cpu").name);
+}
+const high=prepareConfigurations({...base,budgetCLP:2200000},powerful)[0];
+const low=prepareConfigurations({...base,budgetCLP:1000000},selectCandidates({...base,budgetCLP:1000000}))[0];
+assert.notEqual(high.quote.components.find(p=>p.category==="cpu").id,low.quote.components.find(p=>p.category==="cpu").id);
+console.log("Validated prebuilt configurations and high-budget CPU improvement.");

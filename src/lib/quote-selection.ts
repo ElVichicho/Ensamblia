@@ -160,3 +160,65 @@ export function createQuote(content: string, f: BuilderFilters, candidates: Prod
     compatibilityScore:0,pros:[],upgradePath:result.upgradePath,components,compatibilityChecks:checks};
 }
 
+
+export interface Configuration {
+  option: number;
+  quote: BuildQuote;
+  benchmarkScore: number;
+}
+export function prepareConfigurations(f: BuilderFilters, candidates: Product[]): Configuration[] {
+  const of = (category: ComponentCategory) => candidates.filter(p=>p.category===category).sort((a,b)=>a.priceCLP-b.priceCLP);
+  const configurations: Configuration[] = [];
+  const storage = of("storage")[0];
+  if (!storage) return [];
+  const maxCpu = Math.max(1,...of("cpu").map(p=>num(p,"passmark_score")));
+  const maxGpu = Math.max(1,...of("gpu").map(p=>num(p,"gpu_tdmark_time_spy_score")));
+  for (const cpu of of("cpu")) {
+    const boards=of("motherboard").filter(p=>cpu.socket && p.socket && normalize(cpu.socket)===normalize(p.socket)).slice(0,5);
+    const needsGpu=f.useCase==="gaming" || /no posee/i.test(str(cpu,"graphics_name"));
+    const gpuOptions: (Product|undefined)[]=needsGpu?of("gpu"):[undefined,...of("gpu")];
+    for (const board of boards) {
+      const ramOptions=of("ram").filter(p=>memoryType(p)===memoryType(board)).map(p=>({
+        p,quantity:Math.max(1,Math.ceil(capacity(f.ramCapacity)/ramGB(p))),
+      })).filter(r=>Number.isFinite(r.quantity)&&r.quantity<=4 &&
+        r.quantity*num(r.p,"capacity_dimm_quantity_value")<=num(board,"memory_slots_quantity"));
+      ramOptions.sort((a,b)=>a.p.priceCLP*a.quantity-b.p.priceCLP*b.quantity);
+      const ram=ramOptions[0];
+      if (!ram) continue;
+      const needsCooler=/no posee/i.test(str(cpu,"cooler_name")) || f.coolingPreference==="liquid";
+      const cooler=needsCooler?of("cooler").find(p=>
+        (specifications(p) as {sockets:string[]}).sockets.some(s=>normalize(s)===normalize(cpu.socket||""))):undefined;
+      if (needsCooler&&!cooler) continue;
+      for (const gpu of gpuOptions) {
+        const estimatedTdp=num(cpu,"tdp")+(gpu?num(gpu,"gpu_tdp"):0)+75;
+        const psu=of("psu").find(p=>num(p,"power_value")>=Math.max(450,estimatedTdp*1.35));
+        const chasis=of("case").find(p=>
+          num(p,"largest_motherboard_format_format_height")>=num(board,"format_format_height") &&
+          num(p,"largest_motherboard_format_format_width")>=num(board,"format_format_width") &&
+          (!gpu||!num(gpu,"length")||num(p,"max_video_card_length")>=num(gpu,"length")) &&
+          (!cooler||/líquida/i.test(str(cooler,"type_name"))||!num(cooler,"height")||num(p,"max_cpu_cooler_height")>=num(cooler,"height")));
+        if (!psu||!chasis) continue;
+        const chosen=[cpu,board,ram.p,storage,psu,chasis,...gpu?[gpu]:[],...cooler?[cooler]:[]];
+        const components=Object.fromEntries(chosen.map(p=>[p.category,{
+          id:p.id,quantity:p.category==="ram"?ram.quantity:1,reason:"Seleccionado según requisitos y presupuesto.",
+        }]));
+        try {
+          const quote=createQuote(JSON.stringify({buildName:"Configuración compatible",summary:"",upgradePath:"",components}),f,candidates);
+          const cpuScore=num(cpu,"passmark_score")/maxCpu;
+          const gpuScore=gpu?num(gpu,"gpu_tdmark_time_spy_score")/maxGpu:0;
+          const benchmarkScore=f.useCase==="gaming"?cpuScore*.35+gpuScore*.65:cpuScore*.85+gpuScore*.15;
+          configurations.push({option:0,quote,benchmarkScore});
+        } catch (error) {
+          if (!(error instanceof QuoteError)) throw error;
+        }
+      }
+    }
+  }
+  configurations.sort((a,b)=>b.benchmarkScore-a.benchmarkScore||a.quote.actualCostCLP-b.quote.actualCostCLP);
+  const unique=new Map<string,Configuration>();
+  for (const config of configurations) {
+    const key=config.quote.components.filter(p=>p.category==="cpu"||p.category==="gpu").map(p=>p.id).join("-");
+    if (!unique.has(key)) unique.set(key,config);
+  }
+  return [...unique.values()].slice(0,8).map((config,i)=>({...config,option:i+1}));
+}

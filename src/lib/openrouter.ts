@@ -1,5 +1,5 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
-import { createQuote, Product, QuoteError, selectCandidates, specifications } from "./quote-selection";
+import { QuoteError, selectCandidates, specifications, prepareConfigurations } from "./quote-selection";
 
 export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3.5-lightning:free";
 export const OPENROUTER_RATE_LIMIT_MESSAGE =
@@ -9,35 +9,30 @@ export function getFreeOpenRouterModel() {
   return configured?.endsWith(":free") ? configured : DEFAULT_OPENROUTER_MODEL;
 }
 
-function makePrompt(filters: BuilderFilters, candidates: Product[]) {
-  const catalog = candidates.map(p=>({
-    id:p.id, category:p.category, name:p.name, priceCLP:p.priceCLP, ...specifications(p),
-  }));
-  return `Selecciona un computador completo en Chile según estas preferencias:
-${JSON.stringify(filters)}
-Candidatos con precios de referencia por unidad, especificaciones y benchmarks:
-${JSON.stringify(catalog)}
-Objetivo: maximizar el rendimiento útil para el uso y presupuesto. Un presupuesto alto debe aprovechar mejores CPU/GPU, no repetir el armado económico. Apunta a 80-100% del presupuesto si mejora rendimiento, sin gastar por gastar.
-Gaming prioriza GPU y equilibrio con CPU; creative/dev_data prioriza CPU, núcleos, RAM y GPU según uso; office/home_study prioriza respuesta y eficiencia.
-CPU y placa deben compartir socket, RAM y placa el tipo DDR. No selecciones hardware sin datos para asegurar requisitos esenciales.
-Incluye cpu, motherboard, ram, storage, psu y case. gpu es obligatoria para gaming o CPU sin gráficos; cooler cuando la CPU no lo incluya.
-Respeta marca, capacidades mínimas, WiFi, formato e interfaz solicitados. La RAM puede tener quantity=1..4, multiplicando precio y capacidad DEL KIT. El resto quantity=1.
-Suma todas las piezas con cantidades, sin exceder el presupuesto. Usa benchmarks aportados para comparar CPU/GPU, sin inventar FPS.
-Responde SOLO este JSON, con UN campo por categoría y exclusivamente IDs de los candidatos:
-{"buildName":"nombre","summary":"criterio y limitaciones, máximo 40 palabras","upgradePath":"mejora futura","components":{"cpu":{"id":123,"quantity":1,"reason":"motivo breve"},"motherboard":{"id":456,"reason":"motivo"},"ram":{"id":789,"quantity":2,"reason":"motivo"},"storage":{"id":123,"reason":"motivo"},"psu":{"id":123,"reason":"motivo"},"case":{"id":123,"reason":"motivo"},"gpu":{"id":123,"reason":"motivo"},"cooler":{"id":123,"reason":"motivo"}}}
-Omite gpu/cooler únicamente cuando sean innecesarios. Sustituye TODOS los IDs de ejemplo por IDs válidos. No añadas markdown ni razonamiento fuera del JSON.`;
-}
-
 export async function requestBuildFromOpenRouter(
   filters: BuilderFilters, apiKey?: string, modelName = DEFAULT_OPENROUTER_MODEL,
 ): Promise<{ quote: BuildQuote; modelUsed: string }> {
   const token=apiKey||process.env.OPENROUTER_API_KEY;
   if (!token?.trim()) throw new QuoteError("El servicio de cotización requiere configuración del servidor.",503);
   const candidates=selectCandidates(filters);
-  for (const category of ["cpu","motherboard","ram","storage","psu","case"]) {
-    if (!candidates.some(p=>p.category===category)) throw new QuoteError(`El catálogo no tiene opciones de ${category} para estas preferencias. Ajusta el presupuesto o los requisitos.`);
-  }
-  const messages=[{role:"user",content:makePrompt(filters,candidates)}];
+  const configurations=prepareConfigurations(filters,candidates);
+  if (!configurations.length) throw new QuoteError("El catálogo no permite armar un equipo con este presupuesto y requisitos. Prueba ampliar el presupuesto o ajustar las preferencias.");
+  const options=configurations.map(config=>({
+    option:config.option, totalCLP:config.quote.actualCostCLP, comparativeScore:Math.round(config.benchmarkScore*100),
+    components:config.quote.components.map(item=>{
+      const p=candidates.find(p=>String(p.id)===item.id)!;
+      return {category:item.category,name:item.name,quantity:item.quantity,subtotalCLP:item.priceCLP,...specifications(p)};
+    }),
+  }));
+  const prompt = `Elige el mejor computador para estas preferencias: ${JSON.stringify(filters)}.
+Estas configuraciones ya cumplen presupuesto y comprobaciones del catálogo:
+${JSON.stringify(options)}
+Compara benchmarks, capacidad, costo y el uso solicitado. Aprovecha el presupuesto para rendimiento útil; no selecciones siempre la opción más barata.
+comparativeScore es una puntuación relativa de benchmarks para este conjunto, no una medición de FPS.
+Responde SOLO JSON:
+{"option":1,"buildName":"nombre breve","summary":"justificación y limitaciones, máximo 40 palabras","upgradePath":"mejora futura breve","reasons":{"cpu":"motivo de CPU","gpu":"motivo de GPU","ram":"motivo de RAM","storage":"motivo de SSD"}}
+option debe ser un número de las configuraciones proporcionadas. No cambies piezas. No inventes mediciones.`;
+  const messages=[{role:"user",content:prompt}];
   const deadline=Date.now()+50000;
   let lastError="La selección no pudo completarse.";
   for (let attempt=0;attempt<2;attempt++) {
@@ -66,7 +61,21 @@ export async function requestBuildFromOpenRouter(
     if (typeof content!=="string"||!content.trim()) throw new QuoteError("El proveedor devolvió una respuesta vacía. Intenta nuevamente.",503);
     try {
       if (data.choices[0].finish_reason==="length") throw new QuoteError("La respuesta quedó incompleta.");
-      return {quote:createQuote(content,filters,candidates),modelUsed:data.model||modelName};
+      const match=content.match(/\{[\s\S]*\}/);
+      if (!match) throw new QuoteError("La respuesta no contiene JSON.");
+      const result=JSON.parse(match[0]);
+      const config=configurations.find(c=>c.option===Number(result.option));
+      if (!config||typeof result.buildName!=="string"||typeof result.summary!=="string"||typeof result.upgradePath!=="string") {
+        throw new QuoteError("Selecciona un número option válido y completa buildName, summary y upgradePath.");
+      }
+      const quote:BuildQuote={
+        ...config.quote,buildName:result.buildName,executiveSummary:result.summary,
+        performanceSummary:result.summary,upgradePath:result.upgradePath,
+        components:config.quote.components.map(item=>({
+          ...item,aiReason:typeof result.reasons?.[item.category]==="string"?result.reasons[item.category]:item.aiReason,
+        })),
+      };
+      return {quote,modelUsed:data.model||modelName};
     } catch (error) {
       lastError=error instanceof Error?error.message:"Selección inválida.";
       messages.push({role:"assistant",content},{role:"user",content:`Corrige el JSON completo. ${lastError}`});
