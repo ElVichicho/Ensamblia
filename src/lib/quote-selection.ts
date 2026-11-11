@@ -50,11 +50,12 @@ export function specifications(p: Product) {
 
 function matches(p: Product, f: BuilderFilters) {
   if (p.category === "cpu" && f.cpuPreference !== "any" && p.brand?.toLowerCase() !== f.cpuPreference) return false;
+  if (p.category === "psu" && num(p,"certification_value") < 2) return false;
   if (p.category === "gpu" && f.gpuPreference !== "any") {
     const isNvidia = /geforce|nvidia/i.test(p.name);
     if ((f.gpuPreference === "nvidia") !== isNvidia) return false;
   }
-  if (p.category === "ram" && (str(p,"bus_bus_bus_format_name") !== "DIMM" || ramGB(p) * 2 < capacity(f.ramCapacity))) return false;
+  if (p.category === "ram" && (str(p,"bus_bus_bus_format_name") !== "DIMM" || p.specs.is_ecc === true || p.specs.is_fully_buffered === true || ramGB(p) * 2 < capacity(f.ramCapacity))) return false;
   if (p.category === "storage") {
     if (num(p,"capacity_value") < capacity(f.storageCapacity)) return false;
     const sata = /sata/i.test(str(p,"ssd_type_bus_bus_with_version_bus_name"));
@@ -174,7 +175,7 @@ export function prepareConfigurations(f: BuilderFilters, candidates: Product[]):
   const maxCpu = Math.max(1,...of("cpu").map(p=>num(p,"passmark_score")));
   const maxGpu = Math.max(1,...of("gpu").map(p=>num(p,"gpu_tdmark_time_spy_score")));
   for (const cpu of of("cpu")) {
-    const boards=of("motherboard").filter(p=>cpu.socket && p.socket && normalize(cpu.socket)===normalize(p.socket)).slice(0,5);
+    const boards=of("motherboard").filter(p=>cpu.socket && p.socket && normalize(cpu.socket)===normalize(p.socket) && p.priceCLP >= cpu.priceCLP*.25).slice(0,5);
     const needsGpu=f.useCase==="gaming" || /no posee/i.test(str(cpu,"graphics_name"));
     const gpuOptions: (Product|undefined)[]=needsGpu?of("gpu"):[undefined,...of("gpu")];
     for (const board of boards) {
@@ -187,7 +188,7 @@ export function prepareConfigurations(f: BuilderFilters, candidates: Product[]):
       if (!ram) continue;
       const needsCooler=/no posee/i.test(str(cpu,"cooler_name")) || f.coolingPreference==="liquid";
       const cooler=needsCooler?of("cooler").find(p=>
-        (specifications(p) as {sockets:string[]}).sockets.some(s=>normalize(s)===normalize(cpu.socket||""))):undefined;
+        (num(cpu,"tdp") <= 100 || p.priceCLP >= 30000) && (specifications(p) as {sockets:string[]}).sockets.some(s=>normalize(s)===normalize(cpu.socket||""))):undefined;
       if (needsCooler&&!cooler) continue;
       for (const gpu of gpuOptions) {
         const estimatedTdp=num(cpu,"tdp")+(gpu?num(gpu,"gpu_tdp"):0)+75;
