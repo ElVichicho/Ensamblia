@@ -1,6 +1,6 @@
 import type { BuildQuote } from "@/types/pc-builder";
 
-type Offer = { store: string; storeUrl: string; priceCLP: number };
+export type Offer = { store: string; storeUrl: string; priceCLP: number };
 type Plan = { cost: number; offers: (Offer | undefined)[] };
 type Entity = {
   currency_id: number; condition: string; is_visible: boolean; store_id: number;
@@ -40,38 +40,59 @@ export function planStores(choices: Offer[][], budget: number, consolidate: bool
   return cheapest;
 }
 
-export async function attachStoreOffers(quote: BuildQuote, consolidate: boolean): Promise<BuildQuote> {
-  const base = "https://publicapi.solotodo.com";
-  const params = new URLSearchParams();
-  quote.components.forEach(item => params.append("ids", item.id));
-  try {
-    const signal = AbortSignal.timeout(6500);
-    const [offersResponse, storesResponse] = await Promise.all([
-      fetch(`${base}/products/available_entities/?${params}`, {signal, next:{revalidate:180}}),
-      fetch(`${base}/stores/`, {signal, next:{revalidate:86400}}),
-    ]);
-    if (!offersResponse.ok || !storesResponse.ok) throw new Error("SoloTodo no respondió correctamente.");
-    const data = await offersResponse.json() as { results: {product:{id:number}; entities:Entity[]}[] };
-    const stores = await storesResponse.json() as {id:number; name:string; country_id:number}[];
-    const names = new Map(stores.filter(store => store.country_id === 1).map(store => [store.id,store.name]));
-    const choices = quote.components.map(item => (data.results.find(row => String(row.product.id) === item.id)?.entities ?? [])
-      .flatMap((entity): Offer[] => {
-        const name = names.get(entity.store_id);
-        const registry = entity.active_registry;
-        const price = Number(registry?.offer_price) || Number(registry?.normal_price);
-        if (!name || entity.currency_id !== 1 || !registry?.is_available || !entity.is_visible ||
-            entity.condition !== "https://schema.org/NewCondition" || !Number.isSafeInteger(price) || price <= 0 ||
-            !/^https?:\/\//i.test(entity.external_url)) return [];
-        return [{store:entity.seller ? `${name} · ${entity.seller}` : name,
-          storeUrl:entity.external_url, priceCLP:price*(item.quantity ?? 1)}];
-      }));
-    const referenceCost = quote.components.reduce((sum,item,index) => sum + (choices[index].length ? 0 : item.priceCLP),0);
-    const selected = planStores(choices, quote.totalBudgetCLP-referenceCost, consolidate);
-    const components = quote.components.map((item,index) => selected[index] ?
-      {...item,...selected[index]} : {...item,store:"Sin oferta verificada"});
-    return {...quote, components, actualCostCLP:components.reduce((sum,item)=>sum+item.priceCLP,0)};
-  } catch (error) {
-    console.warn("Ofertas SoloTodo:",error);
-    return {...quote,components:quote.components.map(item=>({...item,store:"Sin oferta verificada"}))};
+const base = "https://publicapi.solotodo.com";
+
+export async function fetchStoreOffers(ids: string[], signal: AbortSignal) {
+  const storesResponse = await fetch(`${base}/stores/`, {signal,cache:"no-store"});
+  if (!storesResponse.ok) throw new Error("No se pudieron consultar las tiendas.");
+  const stores = await storesResponse.json() as {id:number; name:string; country_id:number}[];
+  const names = new Map(stores.filter(store => store.country_id === 1).map(store => [store.id,store.name]));
+  const offers: Record<string, Offer[]> = {};
+  async function loadBatch(batch: string[]) {
+    const params = new URLSearchParams();
+    batch.forEach(id => params.append("ids",id));
+    let url = new URL(`${base}/products/available_entities/?${params}`);
+    const visited = new Set<string>();
+    while (true) {
+      if (url.origin !== base || visited.has(url.href)) throw new Error("Paginación de ofertas inválida.");
+      visited.add(url.href);
+      const response = await fetch(url,{signal,cache:"no-store"});
+      if (!response.ok) throw new Error(`Falló la consulta de ofertas (${response.status}).`);
+      const data = await response.json() as {next:string|null;results:{product:{id:number};entities:Entity[]}[]};
+      for (const row of data.results) {
+        const id = String(row.product.id);
+        if (!batch.includes(id)) continue;
+        const byStore = new Map<string, Offer>();
+        for (const entity of row.entities) {
+          const name = names.get(entity.store_id);
+          const registry = entity.active_registry;
+          const price = Number(registry?.offer_price) || Number(registry?.normal_price);
+          if (!name || entity.currency_id !== 1 || !registry?.is_available || !entity.is_visible ||
+              entity.condition !== "https://schema.org/NewCondition" || !Number.isSafeInteger(price) || price <= 0 ||
+              !/^https?:\/\//i.test(entity.external_url)) continue;
+          const store = entity.seller ? `${name} · ${entity.seller}` : name;
+          if (price < (byStore.get(store)?.priceCLP ?? Infinity)) byStore.set(store,{store,storeUrl:entity.external_url,priceCLP:price});
+        }
+        offers[id] = [...byStore.values()];
+      }
+      if (!data.next) break;
+      url = new URL(data.next,base);
+    }
   }
+  for (let offset=0; offset<ids.length; offset+=80) {
+    await Promise.all([0,20,40,60].map(start=>ids.slice(offset+start,offset+start+20))
+      .filter(batch=>batch.length).map(loadBatch));
+  }
+  return offers;
+}
+
+export function attachStoreOffers(quote: BuildQuote, consolidate: boolean, offers: Record<string, Offer[]> = {}): BuildQuote {
+  const choices = quote.components.map(item => (offers[item.id] ?? []).map(offer => ({
+    ...offer, priceCLP:offer.priceCLP*(item.quantity ?? 1),
+  })));
+  const referenceCost = quote.components.reduce((sum,item,index) => sum + (choices[index].length ? 0 : item.priceCLP),0);
+  const selected = planStores(choices,quote.totalBudgetCLP-referenceCost,consolidate);
+  const components = quote.components.map((item,index) => selected[index] ?
+    {...item,...selected[index]} : {...item,store:"Sin oferta verificada"});
+  return {...quote,components,actualCostCLP:components.reduce((sum,item)=>sum+item.priceCLP,0)};
 }

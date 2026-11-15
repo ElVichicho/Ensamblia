@@ -70,13 +70,13 @@ function matches(p: Product, f: BuilderFilters) {
   return true;
 }
 
-export function selectCandidates(f: BuilderFilters): Product[] {
+export function selectCandidates(f: BuilderFilters, catalog: Product[] = products): Product[] {
   const shares: Record<ComponentCategory, number> = {
     cpu: f.useCase === "gaming" ? .2 : .28, gpu: .38, motherboard: .12,
     ram: .1, storage: .1, psu: .06, case: .05, cooler: .04,
   };
   return categories.flatMap(category => {
-    const pool = products.filter(p => p.category === category && p.priceCLP > 0 && p.priceCLP < f.budgetCLP * .65 && matches(p, f));
+    const pool = catalog.filter(p => p.category === category && p.priceCLP > 0 && p.priceCLP < f.budgetCLP * .65 && matches(p, f));
     const target = f.budgetCLP * shares[category];
     const tier = category === "cpu" || category === "gpu" ? pool.filter(p=>p.priceCLP >= target * .45) : pool;
     const eligible = tier.length ? tier : pool;

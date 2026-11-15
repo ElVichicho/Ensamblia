@@ -30,6 +30,7 @@ for (const [id,category] of categories) {
       const price=m?.prices_per_currency?.find(item=>JSON.stringify(item).includes("CLP"))||m?.prices_per_currency?.[0];
       const priceCLP=Math.round(price?.offer_price||price?.normal_price||0);
       if (!priceCLP || p.category_id!==id) continue;
+      if (records.size >= 50) break;
       records.set(p.id, {
         id:p.id, name:p.name, category, categoryLabel:category, brand:p.brand?.name||null,
         priceCLP, solotodoUrl:`https://www.solotodo.cl/products/${p.id}`,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDownToLine, ArrowUpRight, Check, ChevronRight, CircleAlert, LoaderCircle, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Check, ChevronRight, CircleAlert, LoaderCircle, Moon, RefreshCw, SlidersHorizontal, Sun } from "lucide-react";
 import type { BuildQuote, BuilderFilters, ComponentCategory } from "@/types/pc-builder";
 
 const money=(value:number)=>new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(value);
@@ -13,7 +13,13 @@ const initial:BuilderFilters={
   coolingPreference:"air",caseSize:"standard",customInstructions:"",consolidateStores:false,
 };
 
+type SavedCatalog = { token: string; updatedAt: string; count: number };
+const catalogKey = "solotodo-catalog-v1";
+
 export default function HomePage(){
+  const [catalog,setCatalog]=useState<SavedCatalog|null>(null);
+  const [refreshing,setRefreshing]=useState(false);
+  const [catalogNotice,setCatalogNotice]=useState("");
   const [filters,setFilters]=useState(initial);
   const [quote,setQuote]=useState<BuildQuote|null>(null);
   const [submitted,setSubmitted]=useState<BuilderFilters|null>(null);
@@ -26,6 +32,26 @@ export default function HomePage(){
       if(theme==="light"||theme==="dark") document.documentElement.dataset.theme=theme;
     } catch {}
   },[]);
+  useEffect(()=>{
+    try {
+      const saved: SavedCatalog|null=JSON.parse(localStorage.getItem(catalogKey) ?? "null");
+      if(saved && typeof saved.token==="string" && typeof saved.updatedAt==="string") setCatalog(saved);
+    } catch {}
+  },[]);
+  async function refreshCatalog(){
+    setRefreshing(true);setCatalogNotice("");
+    try {
+      const response=await fetch("/api/catalog",{method:"POST"});
+      const updated=await response.json();
+      if(!response.ok || typeof updated.token!=="string") throw new Error(updated.error ?? "No se pudo actualizar el catálogo.");
+      localStorage.setItem(catalogKey,JSON.stringify(updated));
+      setCatalog(updated);setQuote(null);setSubmitted(null);setError("");
+      setCatalogNotice("");
+    } catch(error){
+      setCatalogNotice(error instanceof Error && error.name!=="QuotaExceededError"
+        ? error.message : "No se pudo guardar el catálogo en este navegador.");
+    } finally {setRefreshing(false);}
+  }
   function toggleTheme(){
     const root=document.documentElement;
     const dark=root.dataset.theme?root.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
@@ -40,7 +66,7 @@ export default function HomePage(){
     setLoading(true);setError("");setCopied(false);
     try {
       const response=await fetch("/api/quote",{
-        method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filters}),
+        method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filters,catalogToken:catalog?.token}),
       });
       const data=await response.json().catch(()=>({error:"El servidor no pudo completar la solicitud. Intenta nuevamente."}));
       if(!response.ok||!data.quote) throw new Error(data.error||"No se pudo preparar la cotización.");
@@ -67,6 +93,9 @@ export default function HomePage(){
           <span className="header-title">Cotizador de computadores</span>
           <div className="header-actions">
             <a href="https://www.solotodo.cl/" className="catalog-link">Catálogo <ArrowUpRight size={14}/></a>
+            <button type="button" className="catalog-refresh" disabled={loading||refreshing} onClick={()=>void refreshCatalog()}>
+              <RefreshCw size={14} className={refreshing?"spinner":undefined}/>{refreshing?"Actualizando…":"Actualizar catálogo"}
+            </button>
             <button type="button" className="theme-toggle" onClick={toggleTheme}>
               <span className="theme-to-dark"><Moon size={17}/><span className="sr-only">Activar tema oscuro</span></span>
               <span className="theme-to-light"><Sun size={17}/><span className="sr-only">Activar tema claro</span></span>
@@ -76,12 +105,16 @@ export default function HomePage(){
       </header>
       <div className="subnav"><div>Computación <ChevronRight size={12}/> Armado de PC</div></div>
       <main className="workspace">
+        <p className="catalog-status" role="status">
+          {catalogNotice || (catalog ? `Catálogo guardado: ${catalog.count} productos · ${new Date(catalog.updatedAt).toLocaleString("es-CL")}`
+            : "Usando precios de referencia. Actualiza el catálogo para consultar ofertas y tiendas.")}
+        </p>
         <div className="page-heading"><div><p className="eyebrow">HERRAMIENTAS DE COMPRA</p><h1>Arma tu próximo computador</h1><p>Define lo que necesitas y compara las piezas de tu cotización.</p></div><span className="currency-note">Precios en pesos chilenos · CLP</span></div>
         <div className="builder-layout">
           <aside className="filter-panel">
             <div className="panel-title"><SlidersHorizontal size={16}/><h2>Configura tu equipo</h2></div>
             <form onSubmit={e=>{e.preventDefault();void generate();}}>
-              <fieldset disabled={loading}>
+              <fieldset disabled={loading||refreshing}>
                 <label className="field-label" htmlFor="use">Uso principal</label>
                 <select id="use" value={filters.useCase} onChange={e=>update("useCase",e.target.value as BuilderFilters["useCase"])}>{uses.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
                 <label className="field-label budget-label" htmlFor="budget">Presupuesto máximo <span>CLP</span></label>
@@ -119,7 +152,7 @@ export default function HomePage(){
             </form>
           </aside>
           <section className="quote-area" aria-busy={loading}>
-            {error&&<div role="alert" className="error-message"><CircleAlert size={18}/><div><strong>No pudimos completar la cotización</strong><p>{error}</p></div><button type="button" disabled={loading} onClick={()=>void generate()}>Reintentar</button></div>}
+            {error&&<div role="alert" className="error-message"><CircleAlert size={18}/><div><strong>No pudimos completar la cotización</strong><p>{error}</p></div><button type="button" disabled={loading||refreshing} onClick={()=>void generate()}>Reintentar</button></div>}
             {changed&&<p className="changed-note">Cambiaste las preferencias. Vuelve a cotizar para actualizar las piezas.</p>}
             <div className="quote-sheet">
               <div className="sheet-heading"><div><span className="eyebrow">TU COTIZACIÓN</span><h2>{quote?.buildName||"Lista de componentes"}</h2></div><span className="item-count">{quote?`${quote.components.length} componentes`:"Sin generar"}</span></div>

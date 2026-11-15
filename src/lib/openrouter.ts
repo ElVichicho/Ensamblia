@@ -1,5 +1,5 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
-import { QuoteError, selectCandidates, specifications, prepareConfigurations } from "./quote-selection";
+import { type Product, QuoteError, selectCandidates, specifications, prepareConfigurations } from "./quote-selection";
 
 export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3.5-lightning:free";
 export const OPENROUTER_RATE_LIMIT_MESSAGE =
@@ -10,11 +10,11 @@ export function getFreeOpenRouterModel() {
 }
 
 export async function requestBuildFromOpenRouter(
-  filters: BuilderFilters, apiKey?: string, modelName = DEFAULT_OPENROUTER_MODEL,
+  filters: BuilderFilters, apiKey?: string, modelName = DEFAULT_OPENROUTER_MODEL, catalog?: Product[],
 ): Promise<{ quote: BuildQuote; modelUsed: string }> {
   const token=apiKey||process.env.OPENROUTER_API_KEY;
   if (!token?.trim()) throw new QuoteError("El servicio de cotización requiere configuración del servidor.",503);
-  const candidates=selectCandidates(filters);
+  const candidates=selectCandidates(filters,catalog);
   const configurations=prepareConfigurations(filters,candidates);
   if (!configurations.length) throw new QuoteError("El catálogo no permite armar un equipo con este presupuesto y requisitos. Prueba ampliar el presupuesto o ajustar las preferencias.");
   const options=configurations.map(config=>({
