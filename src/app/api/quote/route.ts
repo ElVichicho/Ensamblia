@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BuilderFilters } from "@/types/pc-builder";
 import { getFreeOpenRouterModel, requestBuildFromOpenRouter } from "@/lib/openrouter";
+import { attachStoreOffers } from "@/lib/store-offers";
 import { QuoteError } from "@/lib/quote-selection";
 
 export const maxDuration = 60;
@@ -18,11 +19,13 @@ export async function POST(req: NextRequest) {
   if (!filters || !Number.isFinite(filters.budgetCLP) || filters.budgetCLP<350000 || filters.budgetCLP>3000000 ||
       Object.entries(options).some(([key,values])=>!values.includes(filters[key as keyof BuilderFilters] as string)) ||
       typeof filters.wifiRequired!=="boolean" ||
+      (filters.consolidateStores!==undefined && typeof filters.consolidateStores!=="boolean") ||
       (filters.customInstructions!==undefined && (typeof filters.customInstructions!=="string"||filters.customInstructions.length>1000))) {
     return NextResponse.json({error:"Revisa el presupuesto y las preferencias de la cotización."},{status:400});
   }
   try {
-    return NextResponse.json(await requestBuildFromOpenRouter(filters,process.env.OPENROUTER_API_KEY,getFreeOpenRouterModel()));
+    const result = await requestBuildFromOpenRouter(filters,process.env.OPENROUTER_API_KEY,getFreeOpenRouterModel());
+    return NextResponse.json({...result, quote:await attachStoreOffers(result.quote, filters.consolidateStores ?? false)});
   } catch (error) {
     console.error("Cotización:",error);
     return NextResponse.json({error:error instanceof QuoteError?error.message:"Ocurrió un error al preparar la cotización."},

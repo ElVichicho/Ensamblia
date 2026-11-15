@@ -61,4 +61,5 @@ export interface BuilderFilters {
   coolingPreference: 'air' | 'liquid' | 'any';
   caseSize: 'compact' | 'standard' | 'any';
   customInstructions?: string;
+  consolidateStores?: boolean;
 }

@@ -10,7 +10,7 @@ const rows: [ComponentCategory,string][]=[["cpu","Procesador"],["motherboard","P
 const initial:BuilderFilters={
   budgetCLP:800000,useCase:"office",cpuPreference:"any",gpuPreference:"any",
   storageCapacity:"1tb",storageType:"nvme",ramCapacity:"16gb",wifiRequired:false,
-  coolingPreference:"air",caseSize:"standard",customInstructions:"",
+  coolingPreference:"air",caseSize:"standard",customInstructions:"",consolidateStores:false,
 };
 
 export default function HomePage(){
@@ -37,7 +37,7 @@ export default function HomePage(){
     setFilters(current=>({...current,[key]:value}));
   }
   async function generate(){
-    setLoading(true);setError("");
+    setLoading(true);setError("");setCopied(false);
     try {
       const response=await fetch("/api/quote",{
         method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filters}),
@@ -51,11 +51,13 @@ export default function HomePage(){
   async function copy(){
     if(!quote)return;
     try {
-      await navigator.clipboard.writeText(`${quote.buildName}\n${quote.components.map(p=>`${p.quantity||1} × ${p.name}: ${money(p.priceCLP)}`).join("\n")}\nTotal: ${money(quote.actualCostCLP)}\nPrecios de referencia. Revisar compatibilidad antes de comprar.`);
+      await navigator.clipboard.writeText(`${quote.buildName}\n${quote.components.map(p=>`${p.quantity||1} × ${p.name}: ${money(p.priceCLP)} · ${p.store}`).join("\n")}\nTotal: ${money(quote.actualCostCLP)}\nPrecios de referencia. Revisar compatibilidad antes de comprar.`);
       setCopied(true);
     } catch {setError("El navegador no permitió copiar. Puedes imprimir la cotización.");}
   }
   const changed=Boolean(submitted&&JSON.stringify(filters)!==JSON.stringify(submitted));
+  const storeCount = new Set(quote?.components.filter(item=>item.storeUrl).map(item=>item.store)).size;
+  const missingOffers = quote?.components.filter(item=>!item.storeUrl).length ?? 0;
   return (
     <div className="site">
       <header className="topbar">
@@ -85,6 +87,12 @@ export default function HomePage(){
                 <label className="field-label budget-label" htmlFor="budget">Presupuesto máximo <span>CLP</span></label>
                 <input id="budget" type="number" min={350000} max={3000000} step={25000} value={filters.budgetCLP} onChange={e=>update("budgetCLP",Number(e.target.value))} required/>
                 <div className="budget-presets">{[500000,1000000,1400000,2200000].map(n=><button className={filters.budgetCLP===n?"selected":""} type="button" key={n} onClick={()=>update("budgetCLP",n)}>{n===2200000?"2,2 M":n===1400000?"1,4 M":n===1000000?"1 M":"500 mil"}</button>)}</div>
+                <label className="field-label" htmlFor="store-preference">Preferencia de compra</label>
+                <select id="store-preference" value={filters.consolidateStores?"few":"cheap"} onChange={e=>update("consolidateStores",e.target.value==="few")}>
+                  <option value="cheap">Menor precio por pieza</option>
+                  <option value="few">Menos tiendas dentro del presupuesto</option>
+                </select>
+                <p className="form-footnote">Se comparan ofertas para las piezas seleccionadas. El despacho se calcula en cada tienda.</p>
                 <div className="filter-divider"/>
                 <label className="field-label" htmlFor="ram">Memoria RAM mínima</label>
                 <select id="ram" value={filters.ramCapacity} onChange={e=>update("ramCapacity",e.target.value as BuilderFilters["ramCapacity"])}>{["16gb","32gb","64gb","any"].map(v=><option key={v} value={v}>{v==="any"?"Sin preferencia":v.toUpperCase()}</option>)}</select>
@@ -121,14 +129,15 @@ export default function HomePage(){
                   const item=quote?.components.find(p=>p.category===category);
                   return <div className="component-row" key={category}>
                     <div className="component-kind"><span className="row-number">{String(index+1).padStart(2,"0")}</span><span>{label}</span></div>
-                    <div className="product-cell">{item?<><a href={item.affiliateUrl} target="_blank" rel="noreferrer">{item.name}<ArrowUpRight size={13}/></a><p>{item.quantity&&item.quantity>1?`${item.quantity} unidades · `:""}{item.aiReason}</p></>:<span className="empty-product">{quote?"Sin pieza adicional":"Por seleccionar"}</span>}</div>
+                    <div className="product-cell">{item?<><a href={item.affiliateUrl} target="_blank" rel="noreferrer">{item.name}<ArrowUpRight size={13}/></a><p>{item.quantity&&item.quantity>1?`${item.quantity} unidades · `:""}{item.aiReason}</p><p>{item.storeUrl ? <a href={item.storeUrl} target="_blank" rel="noreferrer">{item.store}<ArrowUpRight size={12}/></a> : "Sin oferta verificada · precio referencial"}</p></>:<span className="empty-product">{quote?"Sin pieza adicional":"Por seleccionar"}</span>}</div>
                     <div className="product-price">{item?money(item.priceCLP):"—"}</div>
                   </div>;
                 })}
               </div>
               <div className="total-row"><div><span>Total estimado</span><small>{quote?"Precios de referencia. No incluye despacho.":"La cotización aparecerá al configurar tu equipo."}</small></div><strong>{quote?money(quote.actualCostCLP):"—"}</strong></div>
-              {quote&&<div className="budget-row"><span>Presupuesto {money(quote.totalBudgetCLP)}</span><span>Disponible {money(quote.totalBudgetCLP-quote.actualCostCLP)}</span></div>}
+              {quote&&<div className="budget-row"><span>Presupuesto {money(quote.totalBudgetCLP)}</span><span>{quote.actualCostCLP > quote.totalBudgetCLP ? "Sobre el presupuesto" : "Disponible"} {money(Math.abs(quote.totalBudgetCLP-quote.actualCostCLP))}</span></div>}
             </div>
+            {quote&&<p className="changed-note">{storeCount} {storeCount===1?"tienda con oferta":"tiendas con ofertas"}{missingOffers>0 ? ` · ${missingOffers} sin oferta verificada`:""}. Confirma stock, precio y despacho antes de comprar.</p>}
             {quote?<div className="quote-details">
               <div className="details-heading"><h3>Observaciones del armado</h3><button onClick={()=>void copy()} className="text-button" type="button">{copied?<Check size={15}/>:<ArrowDownToLine size={15}/>} {copied?"Copiado":"Copiar cotización"}</button></div>
               <p className="summary-text">{quote.executiveSummary}</p>
