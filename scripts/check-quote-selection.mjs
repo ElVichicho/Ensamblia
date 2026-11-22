@@ -7,12 +7,12 @@ import ts from "typescript";
 const require = createRequire(import.meta.url);
 const source = fs.readFileSync("src/lib/quote-selection.ts", "utf8");
 const compiled = ts.transpileModule(source, { compilerOptions: { esModuleInterop: true, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-const module = { exports: {} };
+const compiledModule = { exports: {} };
 new Function("require", "module", "exports", compiled)(
   id => id.startsWith("@/") ? require(path.resolve("src", id.slice(2))) : require(id),
-  module, module.exports,
+  compiledModule, compiledModule.exports,
 );
-const { selectCandidates, createQuote } = module.exports;
+const { selectCandidates, createQuote } = compiledModule.exports;
 const base = {
   budgetCLP: 500000, useCase: "gaming", cpuPreference: "any", gpuPreference: "any",
   storageCapacity: "1tb", storageType: "nvme", ramCapacity: "16gb",
@@ -54,7 +54,7 @@ assert.throws(()=>createQuote(JSON.stringify({...response,components:{...selecti
 console.log("Passed budget candidate diversity, specifications, quantities, duplicate IDs, RAM, budget and unknown product checks.");
 
 
-const { prepareConfigurations } = module.exports;
+const { prepareConfigurations } = compiledModule.exports;
 for (const [budget,useCase] of [[800000,"office"],[1000000,"gaming"],[2200000,"gaming"]]) {
   const filters={...base,budgetCLP:budget,useCase};
   const options=prepareConfigurations(filters,selectCandidates(filters));

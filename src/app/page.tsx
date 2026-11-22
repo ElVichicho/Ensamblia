@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDownToLine, ArrowUpRight, Check, ChevronRight, CircleAlert, LoaderCircle, Moon, RefreshCw, SlidersHorizontal, Sun } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Cpu, Layers3, Check, ChevronRight, CircleAlert, LoaderCircle, Moon, RefreshCw, SlidersHorizontal, Sun } from "lucide-react";
 import type { BuildQuote, BuilderFilters, ComponentCategory } from "@/types/pc-builder";
 
 const money=(value:number)=>new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(value);
@@ -33,10 +33,13 @@ export default function HomePage(){
     } catch {}
   },[]);
   useEffect(()=>{
-    try {
-      const saved: SavedCatalog|null=JSON.parse(localStorage.getItem(catalogKey) ?? "null");
-      if(saved && typeof saved.token==="string" && typeof saved.updatedAt==="string") setCatalog(saved);
-    } catch {}
+    const frame=requestAnimationFrame(()=>{
+      try {
+        const saved: SavedCatalog|null=JSON.parse(localStorage.getItem(catalogKey) ?? "null");
+        if(saved && typeof saved.token==="string" && typeof saved.updatedAt==="string") setCatalog(saved);
+      } catch {}
+    });
+    return ()=>cancelAnimationFrame(frame);
   },[]);
   async function refreshCatalog(){
     setRefreshing(true);setCatalogNotice("");
@@ -88,11 +91,11 @@ export default function HomePage(){
     <div className="site">
       <header className="topbar">
         <div className="topbar-inner">
-          <a href="https://www.solotodo.cl/" className="wordmark">solo<span>todo</span><span className="country">.cl</span></a>
+          <a href="#cotizador" className="wordmark"><Layers3 size={26}/><span>ensamblia</span></a>
           <span className="header-divider"/>
-          <span className="header-title">Cotizador de computadores</span>
+          <span className="header-title">Cotizador para tu tienda</span>
           <div className="header-actions">
-            <a href="https://www.solotodo.cl/" className="catalog-link">Catálogo <ArrowUpRight size={14}/></a>
+            <a href="https://www.solotodo.cl/" target="_blank" rel="noreferrer" className="catalog-link">Catálogo <ArrowUpRight size={14}/></a>
             <button type="button" className="catalog-refresh" disabled={loading||refreshing} onClick={()=>void refreshCatalog()}>
               <RefreshCw size={14} className={refreshing?"spinner":undefined}/>{refreshing?"Actualizando…":"Actualizar catálogo"}
             </button>
@@ -103,13 +106,19 @@ export default function HomePage(){
           </div>
         </div>
       </header>
-      <div className="subnav"><div>Computación <ChevronRight size={12}/> Armado de PC</div></div>
-      <main className="workspace">
+      <div className="subnav"><div><span>Ensamblia</span> <ChevronRight size={12}/> Cotizador <span className="demo-source">Demo con catálogo SoloTodo</span></div></div>
+      <main className="workspace" id="cotizador">
         <p className="catalog-status" role="status">
           {catalogNotice || (catalog ? `Catálogo guardado: ${catalog.count} productos · ${new Date(catalog.updatedAt).toLocaleString("es-CL")}`
             : "Usando precios de referencia. Actualiza el catálogo para consultar ofertas y tiendas.")}
         </p>
-        <div className="page-heading"><div><p className="eyebrow">HERRAMIENTAS DE COMPRA</p><h1>Arma tu próximo computador</h1><p>Define lo que necesitas y compara las piezas de tu cotización.</p></div><span className="currency-note">Precios en pesos chilenos · CLP</span></div>
+        <div className="page-heading">
+          <div><p className="eyebrow">COTIZADOR DE PC</p>
+            <h1>Tu próximo PC, <span>pieza por pieza.</span></h1>
+            <p>Cuéntanos qué necesitas. Encuentra un armado para tu uso y presupuesto.</p>
+          </div>
+          <div className="heading-aside"><Cpu size={40} strokeWidth={1}/><span>La configuración empieza contigo.</span><small>Precios en pesos chilenos · CLP</small></div>
+        </div>
         <div className="builder-layout">
           <aside className="filter-panel">
             <div className="panel-title"><SlidersHorizontal size={16}/><h2>Configura tu equipo</h2></div>
@@ -161,7 +170,7 @@ export default function HomePage(){
                 {rows.map(([category,label],index)=>{
                   const item=quote?.components.find(p=>p.category===category);
                   return <div className="component-row" key={category}>
-                    <div className="component-kind"><span className="row-number">{String(index+1).padStart(2,"0")}</span><span>{label}</span></div>
+                    <div className="component-kind"><Cpu className="component-icon" size={17} strokeWidth={1.5}/><span className="row-number">{String(index+1).padStart(2,"0")}</span><span>{label}</span></div>
                     <div className="product-cell">{item?<><a href={item.affiliateUrl} target="_blank" rel="noreferrer">{item.name}<ArrowUpRight size={13}/></a><p>{item.quantity&&item.quantity>1?`${item.quantity} unidades · `:""}{item.aiReason}</p><p>{item.storeUrl ? <a href={item.storeUrl} target="_blank" rel="noreferrer">{item.store}<ArrowUpRight size={12}/></a> : "Sin oferta verificada · precio referencial"}</p></>:<span className="empty-product">{quote?"Sin pieza adicional":"Por seleccionar"}</span>}</div>
                     <div className="product-price">{item?money(item.priceCLP):"—"}</div>
                   </div>;
@@ -177,11 +186,12 @@ export default function HomePage(){
               <dl className="check-list">{quote.compatibilityChecks.map((check,i)=><div key={i}><dt>{check.status==="valid"?<Check size={14}/>:<CircleAlert size={14}/>} {check.title}</dt><dd>{check.detail}</dd></div>)}</dl>
               <div className="upgrade-note"><strong>Para más adelante</strong><p>{quote.upgradePath}</p></div>
             </div>:<div className="empty-note"><h3>Tu presupuesto, pieza por pieza.</h3><p>Indica el uso, el monto máximo y las capacidades que necesitas. Aquí podrás revisar productos, cantidades y costo total antes de visitar las tiendas.</p></div>}
-            <div aria-live="polite" className="request-status">{loading?"Consultando el catálogo y preparando la selección. Puede tardar hasta 50 segundos.":""}</div>
+            <div aria-live="polite" className="request-status">{loading?"Preparando la selección con el catálogo guardado. Puede tardar hasta 50 segundos.":""}</div>
           </section>
         </div>
       </main>
-      <footer className="site-footer"><span>SoloTodo · Prototipo académico de Vicente Sampson</span><span>Precios y disponibilidad sujetos a cambios.</span></footer>
+      <footer className="site-footer"><span><strong>ensamblia</strong> · Creado por Vicente Sampson</span><span>Precios y disponibilidad sujetos a cambios.</span></footer>
     </div>
   );
 }
+

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cotizador de computadores | SoloTodo",
-  description: "Cotizador inteligente de computadores con validación de compatibilidad de hardware en tiempo real y optimización de presupuesto para Chile.",
+  title: "Ensamblia | Cotizador de PC para tu tienda",
+  description: "Ensamblia ayuda a elegir componentes de PC según uso, presupuesto y compatibilidad. Demostración del cotizador para tiendas de tecnología.",
 };
 
 export default function RootLayout({
