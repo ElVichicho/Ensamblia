@@ -19,7 +19,7 @@ function description(product: Product, quantity: number): string {
     case "cpu": return `${data.cores || "Sin dato de"} núcleos · socket ${data.socket || "por verificar"}.`;
     case "gpu": return `${data.vramGB || "Sin dato de"} GB de memoria de video · consumo ${data.tdpW || "por verificar"} W.`;
     case "ram": return `${Number(data.capacityGB) * quantity} GB en total · ${data.memoryType || "tipo por verificar"} · ${data.speedMHz || "frecuencia por verificar"} MHz.`;
-    case "storage": return `${data.capacityGB || "Capacidad por verificar"} GB · ${data.interface || "interfaz por verificar"}.`;
+    case "storage": return `${data.capacityGB || "Capacidad por verificar"} GB · ${data.interface || "interfaz por verificar"}.${data.readMBs ? ` Lectura secuencial de ${data.readMBs} MB/s según el catálogo.` : ""}`;
     case "psu": return `${data.watts || "Potencia por verificar"} W · certificación ${data.certification || "por verificar"}.`;
     case "motherboard": return `${data.socket || "Socket por verificar"} · ${data.memoryType || "memoria por verificar"} · ${data.wifi ? "con WiFi" : "sin WiFi identificado"}.`;
     case "case": return `Admite formato ${data.motherboardFormat || "por verificar"} · largo máximo de GPU ${data.maxGpuMM || "por verificar"} mm.`;

@@ -30,6 +30,8 @@ Estas configuraciones ya cumplen presupuesto y comprobaciones del catálogo:
 ${JSON.stringify(options)}
 Compara benchmarks, capacidad, costo y el uso solicitado. Aprovecha el presupuesto para rendimiento útil; no selecciones siempre la opción más barata.
 comparativeScore es una puntuación relativa de benchmarks para este conjunto, no una medición de FPS.
+Explica solo los datos proporcionados. No prometas FPS, resolución, ausencia de cuellos de botella ni mejoras porcentuales en juegos. Las diferencias de benchmarks se calculan aparte en el servidor.
+Respeta el tipo de memoria de la placa: un cambio entre DDR4 y DDR5 requiere cambiar la placa y la RAM. No afirmes soporte de actualizaciones sin datos del fabricante.
 Responde SOLO JSON:
 {"option":1,"buildName":"nombre breve","summary":"justificación y limitaciones, máximo 40 palabras","upgradePath":"mejora futura breve","reasons":{"cpu":"motivo de CPU","gpu":"motivo de GPU","ram":"motivo de RAM","storage":"motivo de SSD"}}
 option debe ser un número de las configuraciones proporcionadas. No cambies piezas. No inventes mediciones.`;
