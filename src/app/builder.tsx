@@ -229,4 +229,3 @@ export default function Builder({mode}:{mode:QuoteMode}){
     </div>
   );
 }
-
