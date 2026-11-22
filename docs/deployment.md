@@ -34,7 +34,7 @@ Al cambiar piezas se compara la fecha del catálogo usado por la cotización con
 - Preview: abre la URL desde una sesión sin autenticar y comprueba que exige acceso de Vercel. Después de autenticar, cotiza una vez y comprueba `mode: ai` y `quote.generationMode: ai`. Esta prueba sí consume cuota. Un cambio de pieza posterior no debe consumir otra llamada de IA.
 - Otras ramas: deben mostrar la demo. No uses la rama `preview` para ejecutar código de un PR externo sin revisar.
 
-`npm test` verifica la concurrencia con un almacenamiento simulado y OpenRouter simulado. La prueba real de Redis confirma también permisos, Lua y persistencia del servicio conectado. CI no dispone de claves ni consulta proveedores externos.
+`npm test` verifica la concurrencia con un almacenamiento simulado y OpenRouter simulado. CI también ejecuta `node scripts/check-redis-integration.mjs` contra Redis 7 en un contenedor desechable, para comprobar el Lua real, exclusión simultánea, TTL y orden de publicación. CI no dispone de claves ni consulta proveedores externos. La prueba posterior al despliegue confirma los permisos, la conexión REST y la persistencia del servicio conectado.
 
 ## Incidencias y recuperación
 

@@ -8,9 +8,6 @@ const categories = [[3,"cpu"],[5,"motherboard"],[7,"ram"],[2,"gpu"],[39,"storage
 export const maxSnapshotLength = 2_000_000;
 export const productsPerCategory = 200;
 
-export function catalogSigningKey() {
-  return process.env.CATALOG_SIGNING_SECRET?.trim() || process.env.OPENROUTER_API_KEY?.trim();
-}
 export type Snapshot = { updatedAt: string; products: Product[]; offers: Record<string, Offer[]> };
 type BrowseProduct = {
   id:number; name:string; category_id:number; brand?:{name:string}; specs?:Record<string,unknown>;
