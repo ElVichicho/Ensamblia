@@ -4,6 +4,13 @@
 
 # Ensamblia
 
+![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS 4](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![OpenRouter API](https://img.shields.io/badge/OpenRouter-API-A72D34?style=for-the-badge&logo=openrouter&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)
+
 Cotizador de computadores con IA que ayuda a elegir componentes según el uso, el presupuesto y las preferencias de compra.
 
 Ensamblia parte de un problema cotidiano al comprar un PC. Elegir cada pieza requiere comparar especificaciones, comprobar compatibilidad y coordinar ofertas de distintas tiendas. La aplicación propone un armado completo, explica la elección y permite explorar alternativas por componente antes de decidir.
