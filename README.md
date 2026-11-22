@@ -29,18 +29,18 @@ El producto está orientado a evolucionar como un **SaaS para tiendas de tecnolo
 - **Hasta tres opciones por categoría.** La pieza seleccionada y hasta dos alternativas que respetan el presupuesto y las comprobaciones disponibles del resto del equipo.
 - **Comparaciones con datos del catálogo.** Diferencias de puntuación PassMark para CPU y 3DMark Time Spy para GPU cuando ambos productos tienen datos. En otras categorías se comparan características como capacidad, velocidad de lectura, potencia o conectividad.
 - **Ofertas y tiendas.** Precio y enlace por pieza, con la opción de priorizar el menor precio o una compra en menos tiendas dentro del presupuesto.
-- **Catálogo actualizado bajo demanda.** El botón Actualizar catálogo obtiene una copia de productos y ofertas que se reutiliza al cotizar y cambiar piezas.
+- **Catálogo diario compartido.** La primera cotización del día actualiza productos y ofertas; el resto reutiliza la copia del servidor. La fecha se calcula en America/Santiago.
 - **Interfaz adaptable.** Tema claro y oscuro, vista móvil y copia de la cotización.
 
 ## Cómo funciona
 
-1. **Obtención de datos.** El catálogo de referencia permite iniciar la aplicación. Una actualización manual consulta SoloTodo y guarda en el navegador una copia comprimida y firmada por el servidor.
+1. **Obtención de datos.** Al cotizar, el servidor consulta la caché persistente en Redis. La primera solicitud del día adquiere una marca exclusiva y descarga productos y ofertas de SoloTodo. El catálogo de referencia permite iniciar la aplicación si falta la caché.
 2. **Selección por contexto.** Las reglas clasifican los productos por uso y filtran según presupuesto y preferencias. Un producto puede pertenecer a varios perfiles.
 3. **Preparación del armado.** El servidor genera hasta ocho configuraciones con las comprobaciones técnicas disponibles.
-4. **Selección de demostración.** El servidor elige una de las configuraciones preparadas según las puntuaciones del catálogo. El endpoint público utiliza este motor de reglas para preservar la cuota del proveedor de IA.
-5. **Personalización.** El servidor calcula alternativas por categoría. Al cambiar una pieza, vuelve a validar el armado y recalcula ofertas, total y comparaciones utilizando la copia guardada.
+4. **Selección según entorno.** Production elige una configuración con reglas y respuestas por uso. La rama Preview estable puede utilizar OpenRouter con configuración de servidor.
+5. **Personalización.** El servidor calcula alternativas por categoría. Al cambiar una pieza, vuelve a validar el armado y recalcula ofertas, total y comparaciones utilizando la copia del servidor.
 
-La integración con OpenRouter se conserva en `src/lib/openrouter.ts`. La demo pública genera el armado inicial y los cambios de componentes con el motor de reglas.
+La integración de Preview utiliza `src/lib/openrouter.ts`. Production fuerza el modo demo incluso si el cliente pide IA o queda una clave configurada por error. Los cambios de piezas se validan con reglas en ambos entornos.
 
 ## Datos y comparaciones
 
@@ -65,7 +65,7 @@ Las comprobaciones abarcan socket, tipo y cantidad de RAM, dimensiones conocidas
 | Interfaz | Next.js 16, React 19, TypeScript, Tailwind CSS 4 y Lucide |
 | Servidor | Route Handlers de Next.js y reglas de selección y compatibilidad |
 | IA | Integración con OpenRouter y NVIDIA Nemotron 3.5 Lightning. La demo pública utiliza reglas |
-| Datos | API pública de SoloTodo, catálogo JSON y copias comprimidas con firma HMAC |
+| Datos | API pública de SoloTodo, catálogo JSON de respaldo y caché diaria comprimida en Redis |
 | Despliegue | Vercel conectado al repositorio de GitHub |
 
 ## Ejecutar en local
@@ -81,19 +81,17 @@ npm run dev
 
 Abre [localhost:3000](http://localhost:3000). El catálogo de referencia permite probar el cotizador y sus alternativas.
 
-Para habilitar también el botón **Actualizar catálogo**, genera un secreto para firmar las copias:
+Sin variables, local usa la demo y el catálogo de referencia. Para probar la actualización diaria, copia [.env.example](.env.example) a `.env.local` y configura Redis. Para probar IA en desarrollo, agrega `ENSAMBLIA_QUOTE_MODE=ai` y una clave de OpenRouter de servidor.
 
-```bash
-node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-```
+## Production y Preview
 
-Guarda el valor generado en un archivo `.env.local` en la raíz del proyecto y reinicia el servidor:
+| Entorno | Rama | Cotización | OpenRouter |
+| --- | --- | --- | --- |
+| Production | main | Demo con reglas y respuestas por uso | Sin clave ni llamadas |
+| Preview estable | preview | IA si ENSAMBLIA_QUOTE_MODE=ai | Clave restringida a esa rama |
+| PRs y otras ramas | Cualquier otra | Demo | Sin acceso a IA desde el cotizador |
 
-```dotenv
-CATALOG_SIGNING_SECRET=pega_aqui_el_valor_generado
-```
-
-En Vercel, configura esta variable en el entorno de producción y vuelve a desplegar. Los despliegues anteriores pueden seguir firmando con `OPENROUTER_API_KEY` hasta configurar el secreto independiente. Al cambiar el secreto, actualiza el catálogo para renovar la copia guardada.
+Consulta [la configuración de Vercel y la operación del catálogo](docs/deployment.md) para conectar Redis, proteger Preview, asignar su URL y verificar el despliegue. Los cambios de variables requieren un despliegue nuevo.
 
 ## Comprobaciones y comandos
 
@@ -105,10 +103,11 @@ npx tsc --noEmit
 node scripts/check-quote-selection.mjs
 node scripts/check-component-alternatives.mjs
 node scripts/check-demo-mode.mjs
+node scripts/check-daily-catalog.mjs
 npm run build
 ```
 
-Las comprobaciones cubren presupuestos, selección de candidatos, cantidades de RAM, compatibilidad de los cambios, cálculo de porcentajes, datos faltantes, agrupación de tiendas y filtrado por uso. La prueba de integración con OpenRouter utiliza una respuesta simulada para verificar el contenido enviado al modelo. La prueba de modo demo comprueba que el endpoint público, las peticiones que intentan activar IA y los cambios de piezas realizan cero llamadas de red.
+Las comprobaciones cubren presupuestos, selección de candidatos, cantidades de RAM, compatibilidad de los cambios, cálculo de porcentajes, datos faltantes, agrupación de tiendas y filtrado por uso. OpenRouter se prueba con respuestas simuladas. Las pruebas de entorno comprueban el aislamiento de Production y la integración de Preview. Las de caché cubren instancias simultáneas, cambio de día en Chile, fallos y conservación de datos.
 
 Para actualizar el catálogo de referencia del repositorio:
 
@@ -123,13 +122,15 @@ Este comando consulta productos y ofertas de SoloTodo y reemplaza el archivo de 
 ```text
 src/
 ├── app/
-│   ├── api/catalog/route.ts      # Actualización y firma del catálogo
 │   ├── api/quote/route.ts        # Cotización y cambios de componentes
-│   └── page.tsx                 # Interfaz del cotizador
+│   ├── builder.tsx              # Interfaz interactiva
+│   └── page.tsx                 # Modo elegido en el servidor
 ├── data/solotodo-catalog.json    # Catálogo de referencia
 ├── lib/
 │   ├── catalog-profiles.ts      # Clasificación y filtrado por uso
-│   ├── catalog-snapshot.ts      # Descarga y copias firmadas
+│   ├── catalog-snapshot.ts      # Descarga de productos y ofertas
+│   ├── daily-catalog.ts         # Caché compartida y marca diaria
+│   ├── deployment-mode.ts       # Aislamiento de entornos
 │   ├── component-alternatives.ts
 │   ├── openrouter.ts
 │   ├── quote-selection.ts       # Armados y comprobaciones técnicas

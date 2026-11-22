@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BuilderFilters } from "@/types/pc-builder";
-import { catalogSigningKey, decodeSnapshot, maxSnapshotLength } from "@/lib/catalog-snapshot";
+import { getDailyCatalog } from "@/lib/daily-catalog";
+import { quoteMode } from "@/lib/deployment-mode";
+import { getFreeOpenRouterModel, requestBuildFromOpenRouter } from "@/lib/openrouter";
+import { createProfileIndex } from "@/lib/catalog-profiles";
 import { attachStoreOffers } from "@/lib/store-offers";
-import { products, QuoteError } from "@/lib/quote-selection";
+import { QuoteError } from "@/lib/quote-selection";
 import { rebuildSelection, withAlternatives } from "@/lib/component-alternatives";
 import { createDemoQuote } from "@/lib/demo-quote";
 
-export const maxDuration = 60;
+export const maxDuration = 180;
 export async function POST(req: NextRequest) {
   let body;
   try { body=await req.json(); }
@@ -25,23 +28,25 @@ export async function POST(req: NextRequest) {
       (filters.customInstructions!==undefined && (typeof filters.customInstructions!=="string"||filters.customInstructions.length>1000))) {
     return NextResponse.json({error:"Revisa el presupuesto y las preferencias de la cotización."},{status:400});
   }
-  const key = catalogSigningKey();
-  let snapshot;
-  if (body.catalogToken !== undefined) {
-    try {
-      if (!key || typeof body.catalogToken !== "string" || body.catalogToken.length > maxSnapshotLength) throw new Error();
-      snapshot = decodeSnapshot(body.catalogToken,key);
-    } catch {
-      return NextResponse.json({error:"La copia guardada ya no es válida. Pulsa Actualizar catálogo."},{status:400});
-    }
-  }
   try {
-    if (body.selection !== undefined) {
-      const quote=attachStoreOffers(rebuildSelection(body.selection,filters,snapshot?.products ?? products),filters.consolidateStores ?? false,snapshot?.offers);
-      return NextResponse.json({mode:"demo",quote:{...withAlternatives(quote,filters,snapshot?.products ?? products,snapshot?.offers),generationMode:"demo"}});
+    const mode = quoteMode();
+    if (mode === "ai" && !process.env.OPENROUTER_API_KEY?.trim()) {
+      return NextResponse.json({error:"Configura OPENROUTER_API_KEY en Preview para probar IA."},{status:503});
     }
-    const quote=attachStoreOffers(createDemoQuote(filters,snapshot?.products ?? products),filters.consolidateStores ?? false,snapshot?.offers);
-    return NextResponse.json({mode:"demo",quote:withAlternatives(quote,filters,snapshot?.products ?? products,snapshot?.offers)});
+    const { snapshot, status } = await getDailyCatalog();
+    const catalog = { updatedAt: snapshot.updatedAt, count: snapshot.products.length, status,
+      profiles: Object.fromEntries(Object.entries(createProfileIndex(snapshot.products)).map(([useCase,ids])=>[useCase,ids.length])),
+    };
+    if (body.selection !== undefined) {
+      if (body.catalogUpdatedAt !== snapshot.updatedAt) return NextResponse.json({error:"El catálogo cambió. Cotiza nuevamente antes de cambiar piezas."},{status:409});
+      const quote=attachStoreOffers(rebuildSelection(body.selection,filters,snapshot.products),filters.consolidateStores ?? false,snapshot.offers);
+      return NextResponse.json({mode,catalog,quote:{...withAlternatives(quote,filters,snapshot.products,snapshot.offers),generationMode:mode}});
+    }
+    const generated = mode === "ai"
+      ? (await requestBuildFromOpenRouter(filters, process.env.OPENROUTER_API_KEY, getFreeOpenRouterModel(), snapshot.products)).quote
+      : createDemoQuote(filters,snapshot.products);
+    const quote=attachStoreOffers(generated,filters.consolidateStores ?? false,snapshot.offers);
+    return NextResponse.json({mode,catalog,quote:{...withAlternatives(quote,filters,snapshot.products,snapshot.offers),generationMode:mode}});
   } catch (error) {
     console.error("Cotización:",error);
     return NextResponse.json({error:error instanceof QuoteError?error.message:"Ocurrió un error al preparar la cotización."},

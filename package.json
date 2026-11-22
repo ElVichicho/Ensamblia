@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node scripts/check-quote-selection.mjs && node scripts/check-component-alternatives.mjs && node scripts/check-demo-mode.mjs",
+    "test": "node scripts/check-quote-selection.mjs && node scripts/check-component-alternatives.mjs && node scripts/check-demo-mode.mjs && node scripts/check-daily-catalog.mjs",
     "fetch-catalog": "node scripts/fetch-catalog.mjs"
   },
   "dependencies": {
