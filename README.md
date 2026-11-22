@@ -97,6 +97,8 @@ En Vercel, configura esta variable en el entorno de producción y vuelve a despl
 
 ## Comprobaciones y comandos
 
+Para contribuir, revisa [CONTRIBUTING.md](CONTRIBUTING.md), el [registro de cambios](CHANGELOG.md) y la [política de seguridad](SECURITY.md). Los cambios de código se revisan mediante PRs con CI.
+
 ```bash
 npm run lint
 npx tsc --noEmit
