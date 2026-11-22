@@ -1,64 +1,52 @@
-import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { loadTypescript } from "./load-typescript.mjs";
-
-const require = createRequire(import.meta.url);
-const { NextRequest } = require("next/server");
-const { POST } = loadTypescript("src/app/api/quote/route.ts");
-const { products } = loadTypescript("src/lib/quote-selection.ts");
-const { encodeSnapshot } = loadTypescript("src/lib/catalog-snapshot.ts");
-const originalFetch = globalThis.fetch;
-const originalKey = process.env.OPENROUTER_API_KEY;
-const originalSigningKey = process.env.CATALOG_SIGNING_SECRET;
-let networkCalls = 0;
-globalThis.fetch = async () => {
-  networkCalls++;
-  throw new Error("Demo must not make network requests");
-};
-process.env.OPENROUTER_API_KEY = "test-provider-key-must-not-be-used";
-process.env.CATALOG_SIGNING_SECRET = "test-catalog-signing-secret";
-const filters = {
-  budgetCLP: 1800000, useCase: "gaming", cpuPreference: "any", gpuPreference: "any",
-  storageCapacity: "1tb", storageType: "nvme", ramCapacity: "16gb",
-  wifiRequired: false, coolingPreference: "air", caseSize: "standard",
-};
-async function send(body) {
-  const response = await POST(new NextRequest("http://localhost/api/quote", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  }));
-  return { status: response.status, body: await response.json() };
-}
-try {
-  for (const useCase of ["office", "home_study", "creative", "gaming", "dev_data"]) {
-    const response = await send({ filters: { ...filters, useCase }, mode: "ai", useAI: true });
-    assert.equal(response.status, 200, JSON.stringify(response.body));
-    assert.equal(response.body.mode, "demo");
-    assert.equal(response.body.quote.generationMode, "demo");
-    assert.equal(response.body.quote.catalogSelection.sentProducts, 0);
-    assert(response.body.quote.actualCostCLP <= filters.budgetCLP);
-    assert(response.body.quote.alternatives.cpu.length > 1);
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {loadTypescript} from './load-typescript.mjs';
+const require=createRequire(import.meta.url),{NextRequest}=require('next/server');
+const {POST}=loadTypescript('src/app/api/quote/route.ts');
+const {quoteMode}=loadTypescript('src/lib/deployment-mode.ts');
+const originalEnv={...process.env},originalFetch=globalThis.fetch;
+let calls=0;
+globalThis.fetch=async()=>{calls++;throw Error('Unexpected network request')};
+const filters={budgetCLP:1800000,useCase:'gaming',cpuPreference:'any',gpuPreference:'any',storageCapacity:'1tb',storageType:'nvme',ramCapacity:'16gb',wifiRequired:false,coolingPreference:'air',caseSize:'standard'};
+async function send(body){const r=await POST(new NextRequest('http://localhost/api/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()};}
+try{
+  delete process.env.UPSTASH_REDIS_REST_URL;delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  process.env.VERCEL='1';process.env.VERCEL_ENV='production';process.env.VERCEL_GIT_COMMIT_REF='preview';
+  process.env.ENSAMBLIA_QUOTE_MODE='ai';process.env.OPENROUTER_API_KEY='dummy-key-must-not-be-used';
+  assert.equal(quoteMode(),'demo');
+  for(const useCase of ['office','home_study','creative','gaming','dev_data']){
+    const r=await send({filters:{...filters,useCase},mode:'ai',useAI:true,catalogToken:'untrusted-client-data'});
+    assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.mode,'demo');
+    assert.equal(r.body.quote.generationMode,'demo');assert.equal(r.body.quote.catalogSelection.sentProducts,0);
+    assert.equal(r.body.catalog.status,'unconfigured');assert(r.body.quote.actualCostCLP<=filters.budgetCLP);
   }
-  const catalogToken = encodeSnapshot({ updatedAt: new Date().toISOString(), products, offers: {} }, process.env.CATALOG_SIGNING_SECRET);
-  const initial = await send({ filters, catalogToken });
-  assert.equal(initial.status, 200);
-  const option = initial.body.quote.alternatives.cpu[1];
-  const selection = initial.body.quote.components.map(item => item.category === "cpu" ? option.component : item);
-  const changed = await send({ filters, selection, catalogToken, mode: "ai" });
-  assert.equal(changed.status, 200);
-  assert.equal(changed.body.quote.generationMode, "demo");
-  assert.equal(changed.body.quote.actualCostCLP, option.totalCLP);
-  delete process.env.CATALOG_SIGNING_SECRET;
-  const legacyToken = encodeSnapshot({ updatedAt: new Date().toISOString(), products, offers: {} }, process.env.OPENROUTER_API_KEY);
-  assert.equal((await send({ filters, catalogToken: legacyToken })).status, 200, "Existing catalog signatures must keep working without consuming AI requests");
-  delete process.env.OPENROUTER_API_KEY;
-  const withoutApiKey = await send({ filters });
-  assert.equal(withoutApiKey.status, 200, "The public demo must work without an OpenRouter key");
-  assert.equal(networkCalls, 0, "Direct endpoint calls, signed catalogs and swaps must consume zero provider requests");
-  console.log("Passed demo endpoint checks for all five uses, mode bypass attempts, signed catalogs, component changes and zero network/provider calls.");
-} finally {
-  globalThis.fetch = originalFetch;
-  if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
-  else process.env.OPENROUTER_API_KEY = originalKey;
-  if (originalSigningKey === undefined) delete process.env.CATALOG_SIGNING_SECRET;
-  else process.env.CATALOG_SIGNING_SECRET = originalSigningKey;
+  const initial=await send({filters}),option=initial.body.quote.alternatives.cpu[1];
+  const selection=initial.body.quote.components.map(item=>item.category==='cpu'?option.component:item);
+  const changed=await send({filters,selection,catalogUpdatedAt:initial.body.catalog.updatedAt});
+  assert.equal(changed.status,200);assert.equal(changed.body.quote.actualCostCLP,option.totalCLP);
+  assert.equal((await send({filters,selection,catalogUpdatedAt:'old'})).status,409);
+  delete process.env.OPENROUTER_API_KEY;assert.equal((await send({filters})).status,200);
+  assert.equal(calls,0,'Production never calls the IA provider even with an AI flag or leftover key');
+  process.env.VERCEL_ENV='preview';process.env.VERCEL_GIT_COMMIT_REF='codex/untrusted-feature';
+  assert.equal(quoteMode(),'demo');
+  process.env.VERCEL_GIT_COMMIT_REF='preview';assert.equal(quoteMode(),'ai');
+  assert.equal((await send({filters})).status,503,'AI preview needs a server key');
+  assert.equal(calls,0);
+  process.env.OPENROUTER_API_KEY='dummy-preview-key';
+  globalThis.fetch=async(url,init)=>{
+    calls++;assert.equal(url,'https://openrouter.ai/api/v1/chat/completions');
+    assert.equal(init.headers.Authorization,'Bearer dummy-preview-key');
+    return Response.json({choices:[{message:{content:JSON.stringify({option:1,buildName:'Prueba IA',summary:'Selección de prueba.',upgradePath:'Revisar almacenamiento',reasons:{cpu:'Prueba',gpu:'Prueba',ram:'Prueba',storage:'Prueba'}})}}]});
+  };
+  const ai=await send({filters});assert.equal(ai.status,200,JSON.stringify(ai.body));
+  assert.equal(ai.body.mode,'ai');assert.equal(ai.body.quote.generationMode,'ai');assert.equal(calls,1);
+  const swap=await send({filters,selection:ai.body.quote.components,catalogUpdatedAt:ai.body.catalog.updatedAt});
+  assert.equal(swap.status,200);assert.equal(calls,1,'Changing pieces does not spend AI quota');
+  assert.equal(quoteMode({NODE_ENV:'production',ENSAMBLIA_QUOTE_MODE:'ai'}),'demo');
+  assert.equal(quoteMode({NODE_ENV:'development',ENSAMBLIA_QUOTE_MODE:'ai'}),'ai');
+  console.log('Passed production quota isolation, all uses, preview branch gate, missing keys, simulated AI, validated swaps and stale catalog conflicts.');
+}finally{
+ globalThis.fetch=originalFetch;
+ for(const key of Object.keys(process.env))if(!(key in originalEnv))delete process.env[key];
+ Object.assign(process.env,originalEnv);
 }
