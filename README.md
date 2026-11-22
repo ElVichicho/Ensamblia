@@ -1,120 +1,136 @@
-# 🚀 SoloTodo AI PC Builder - Asistente Consultivo de Hardware
+<p align="center">
+  <img src="public/ensamblia-icon.png" alt="Icono de Ensamblia" width="88" />
+</p>
 
-> **Proyecto de Inteligencia Artificial para SoloTodo (Chile)**  
-> Asignatura: **Aplicaciones de Inteligencia Artificial (TI2082)** · Evaluaciones Sumativas 3 y 4 (ES3 - ES4)  
-> Estudiante: **Vicente Sampson**  
-> Docente: **Paul André Beltrand Urra**  
+# Ensamblia
 
-![Next.js](https://img.shields.io/badge/Next.js-15%2B-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![OpenRouter](https://img.shields.io/badge/OpenRouter-API-orange?style=for-the-badge)
-![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel)
+Cotizador de computadores con IA que ayuda a elegir componentes según el uso, el presupuesto y las preferencias de compra.
 
----
+Ensamblia parte de un problema cotidiano al comprar un PC. Elegir cada pieza requiere comparar especificaciones, comprobar compatibilidad y coordinar ofertas de distintas tiendas. La aplicación propone un armado completo, explica la elección y permite explorar alternativas por componente antes de decidir.
 
-## 📌 1. Definición del Proyecto y Contexto de Negocio
+El producto está orientado a evolucionar como un **SaaS para tiendas de tecnología**, conectado al catálogo de cada empresa. La demo actual utiliza la API pública de SoloTodo para trabajar con productos y ofertas de comercios chilenos.
 
-El proyecto consiste en integrar un **asistente de venta consultiva basado en modelos de lenguaje (LLM vía la API de OpenRouter)** dentro de la plataforma **SoloTodo**, el comparador y cotizador de tecnología más grande de Chile.
+**[Probar la demo](https://ensamblia.vercel.app)**
 
-### 🏢 La Organización y el Problema Concreto
-* **Situación actual:** SoloTodo cuenta con un cotizador y armador de PC que opera de manera **completamente manual**.
-* **El problema:** Usuarios sin conocimientos avanzados de hardware se abruman al validar compatibilidades críticas (zócalos de CPU, chipsets de placa madre, estándares de memoria DDR4/DDR5, potencia continua de la fuente de poder, factores de forma y espacio físico en gabinetes). Esto provoca una alta tasa de **abandono de sesión**.
-* **Impacto económico:** Cada abandono representa una pérdida directa de ingresos por clics no concretados hacia las tiendas asociadas (modelo de afiliados / costo por clic - CPC).
+![Comparación de procesadores con precios, alternativas y diferencias de benchmarks en Ensamblia](public/ensamblia-preview.jpg)
 
-### 💡 Impacto y Modelo de Negocio (Business Model Canvas)
-* **Tipo de Modelo de IA:** *"IA que mejora un producto existente"*. Transforma una herramienta pasiva de filtrado en un asesor consultivo inteligente.
-* **Propuesta de Valor:**
-  > *"Para usuarios de SoloTodo que desean armar un computador sin conocimientos técnicos, nuestro asesor con IA diseña cotizaciones personalizadas y 100% compatibles en segundos, eliminando el abandono por dudas de hardware y conectando directamente con las mejores ofertas en tiendas chilenas."*
-* **Indicador de Negocio:** Aumento en la tasa de conversión de armados a clics de compra hacia tiendas asociadas (Meta: >20%) y reducción del tiempo de cotización.
-* **Indicador de IA:** Porcentaje de presupuestos generados sin errores de incompatibilidad de hardware (Meta: >96%) con latencia inferior a 3 segundos.
+## Funciones
 
----
+- **Cotización por uso y presupuesto.** Perfiles de oficina, hogar y estudio, diseño y edición, videojuegos, y desarrollo y datos. Incluye preferencias de marcas, memoria, almacenamiento, refrigeración, gabinete y WiFi.
+- **Hasta tres opciones por categoría.** La pieza seleccionada y hasta dos alternativas que respetan el presupuesto y las comprobaciones disponibles del resto del equipo.
+- **Comparaciones con datos del catálogo.** Diferencias de puntuación PassMark para CPU y 3DMark Time Spy para GPU cuando ambos productos tienen datos. En otras categorías se comparan características como capacidad, velocidad de lectura, potencia o conectividad.
+- **Ofertas y tiendas.** Precio y enlace por pieza, con la opción de priorizar el menor precio o una compra en menos tiendas dentro del presupuesto.
+- **Catálogo actualizado bajo demanda.** El botón Actualizar catálogo obtiene una copia de productos y ofertas que se reutiliza al cotizar y cambiar piezas.
+- **Interfaz adaptable.** Tema claro y oscuro, vista móvil y copia de la cotización.
 
-## ✨ 2. Características del Prototipo
+## Cómo funciona
 
-* **🎨 Identidad Visual Oficial SoloTodo:** Paleta moderna en tonos anaranjados corporativos (`#f97316` / `#ea580c`), contraste oscuro de alta legibilidad y tarjetas de componentes fieles al diseño de SoloTodo.
-* **🎛️ Wizard Consultivo Interactivo:**
-  * Control deslizante de presupuesto en pesos chilenos (**CLP**) con presets rápidos ($500.000, $850.000, $1.400.000, $2.200.000).
-  * Selección de propósito (eSports 1080p, Gaming AAA 1440p/4K, Edición & Streaming, IA/Deep Learning, Productividad).
-  * Preferencias de marca (AMD Ryzen / Intel Core, NVIDIA GeForce / AMD Radeon).
-  * Campo de requerimientos especiales en lenguaje natural.
-* **🛡️ Auditoría de Compatibilidad en Tiempo Real:**
-  * Socket CPU vs Placa Madre (AM4, AM5, LGA1700).
-  * Memoria RAM soportada y perfiles XMP/EXPO.
-  * Estimación de consumo eléctrico (TDP total) y cálculo de fuente recomendada con margen >35%.
-  * Dimensiones de gabinete vs longitud de GPU y cooler de CPU.
-  * Índice de balance para evitar cuellos de botella CPU-GPU.
-* **🛒 Tarjetas de Hardware con Enlaces de Afiliados (CPC):**
-  * Desglose completo de piezas con precios de tiendas chilenas (*SpDigital, PC Factory, Winpy, Dust2, Infor-Ingen, Central Gamer*).
-  * Explicación del criterio de la IA para cada pieza.
-  * Botones *"Ver en tienda"* para simular el flujo comercial de SoloTodo.
-* **⚡ Resiliencia Doble (OpenRouter + Motor Local de Fallback):**
-  * Conexión a OpenRouter con soporte para múltiples LLMs (Gemini 2.0 Flash, Llama 3.3 70B, etc.).
-  * Si la clave de API no está presente o falla la red, el sistema activa un **motor inteligente local** para garantizar que la demostración en vivo nunca falle.
+1. **Obtención de datos.** El catálogo de referencia permite iniciar la aplicación. Una actualización manual consulta SoloTodo y guarda en el navegador una copia comprimida y firmada por el servidor.
+2. **Selección por contexto.** Las reglas clasifican los productos por uso y filtran según presupuesto y preferencias. Un producto puede pertenecer a varios perfiles.
+3. **Preparación del armado.** El servidor genera hasta ocho configuraciones con las comprobaciones técnicas disponibles.
+4. **Recomendación con IA.** OpenRouter recibe las configuraciones preparadas. El modelo selecciona una opción y redacta su explicación. Los precios y las piezas se recuperan del catálogo.
+5. **Personalización.** El servidor calcula alternativas por categoría. Al cambiar una pieza, vuelve a validar el armado y recalcula ofertas, total y comparaciones utilizando la copia guardada.
 
----
+Los cambios de componentes reutilizan las reglas del servidor y evitan una nueva consulta al modelo.
 
-## 🛠️ 3. Pila Tecnológica (Stack)
+## Datos y comparaciones
 
-* **Frontend:** [Next.js](https://nextjs.org/) (App Router), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/)
-* **Iconografía:** [Lucide React](https://lucide.dev/)
-* **Backend:** Next.js Route Handlers (`/api/quote`)
-* **Proveedor de IA:** [OpenRouter API](https://openrouter.ai/)
-* **Despliegue:** [Vercel](https://vercel.com/)
+El catálogo de referencia incluido contiene **1.511 productos en ocho categorías**, con un máximo de **200 por categoría**. La cantidad disponible puede variar al actualizar las ofertas.
 
----
+La selección por contexto reduce los datos enviados a la IA. Por ejemplo, las reglas de oficina excluyen productos de alto consumo o de estaciones de trabajo cuando sus características quedan fuera del perfil. Después se aplican las preferencias y el presupuesto para preparar las configuraciones.
 
-## 🚀 4. Instalación y Ejecución Local
+Los porcentajes de CPU y GPU se calculan en el servidor con esta fórmula:
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone https://github.com/ElVichicho/Ensamblia.git
-   cd Ensamblia
-   ```
-
-2. **Instalar dependencias:**
-   ```bash
-   npm install
-   ```
-
-3. **Configurar variables de entorno (Opcional):**
-   Crea un archivo `.env.local` en la raíz de `solotodo-ai`:
-   ```env
-   OPENROUTER_API_KEY=tu_clave_de_openrouter_aqui
-   ```
-   *(También puedes ingresar la clave directamente desde el botón "Configurar IA" en la interfaz web).*
-
-4. **Iniciar el servidor de desarrollo:**
-   ```bash
-   npm run dev
-   ```
-   Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
-
----
-
-## 📦 5. Estructura del Proyecto
-
-```plaintext
-solotodo-ai/
-├── src/
-│   ├── app/
-│   │   ├── api/
-│   │   │   └── quote/route.ts     # Endpoint de cotización y validación
-│   │   ├── globals.css            # Estilos globales y temas
-│   │   ├── layout.tsx             # Layout principal y metadatos
-│   │   └── page.tsx               # Interfaz de usuario SoloTodo AI
-│   ├── lib/
-│   │   ├── hardware-db.ts         # Catálogo chileno y motor de respaldo local
-│   │   └── openrouter.ts          # Integración con API de OpenRouter
-│   └── types/
-│       └── pc-builder.ts          # Tipos de datos para cotización y compatibilidad
-├── package.json
-└── README.md
+```text
+(puntaje de la alternativa / puntaje de la pieza seleccionada - 1) × 100
 ```
 
----
+La pieza seleccionada es la referencia. Al cambiarla se recalculan las diferencias. Los porcentajes describen puntuaciones de benchmarks del catálogo y el rendimiento real depende de la tarea. Cuando falta un puntaje, la comparación utiliza las características disponibles.
 
-## 👤 Autor
-* **Vicente Sampson** - Estudiante de Ingeniería en Informática  
-* Proyecto desarrollado para la asignatura **TI2082 - Aplicaciones de Inteligencia Artificial** (2026).
+Las comprobaciones abarcan socket, tipo y cantidad de RAM, dimensiones conocidas, refrigeración y potencia estimada. La interfaz muestra las verificaciones pendientes, como BIOS, conectores e interfaces. Los precios, la disponibilidad y el despacho se confirman en cada tienda.
+
+## Tecnologías
+
+| Área | Tecnologías |
+| --- | --- |
+| Interfaz | Next.js 16, React 19, TypeScript, Tailwind CSS 4 y Lucide |
+| Servidor | Route Handlers de Next.js y reglas de selección y compatibilidad |
+| IA | OpenRouter, con NVIDIA Nemotron 3.5 Lightning gratuito como modelo predeterminado |
+| Datos | API pública de SoloTodo, catálogo JSON y copias comprimidas con firma HMAC |
+| Despliegue | Vercel conectado al repositorio de GitHub |
+
+## Ejecutar en local
+
+Necesitas Node.js 22, npm y una API key de OpenRouter.
+
+```bash
+git clone https://github.com/ElVichicho/Ensamblia.git
+cd Ensamblia
+npm ci
+```
+
+Crea un archivo `.env.local` en la raíz del proyecto:
+
+```dotenv
+OPENROUTER_API_KEY=tu_clave_de_openrouter
+OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free
+```
+
+La clave se utiliza en el servidor para consultar el modelo y firmar las copias del catálogo. El modelo predeterminado es gratuito y está sujeto a los límites y la disponibilidad del proveedor.
+
+```bash
+npm run dev
+```
+
+Abre [localhost:3000](http://localhost:3000). Puedes pulsar **Actualizar catálogo** para cargar ofertas recientes y sus tiendas.
+
+## Comprobaciones y comandos
+
+```bash
+npm run lint
+npx tsc --noEmit
+node scripts/check-quote-selection.mjs
+node scripts/check-component-alternatives.mjs
+npm run build
+```
+
+Las comprobaciones cubren presupuestos, selección de candidatos, cantidades de RAM, compatibilidad de los cambios, cálculo de porcentajes, datos faltantes, agrupación de tiendas y filtrado por uso. La prueba de integración con OpenRouter utiliza una respuesta simulada para verificar el contenido enviado al modelo.
+
+Para actualizar el catálogo de referencia del repositorio:
+
+```bash
+npm run fetch-catalog
+```
+
+Este comando consulta productos y ofertas de SoloTodo y reemplaza el archivo de referencia al completar la descarga.
+
+## Estructura
+
+```text
+src/
+├── app/
+│   ├── api/catalog/route.ts      # Actualización y firma del catálogo
+│   ├── api/quote/route.ts        # Cotización y cambios de componentes
+│   └── page.tsx                 # Interfaz del cotizador
+├── data/solotodo-catalog.json    # Catálogo de referencia
+├── lib/
+│   ├── catalog-profiles.ts      # Clasificación y filtrado por uso
+│   ├── catalog-snapshot.ts      # Descarga y copias firmadas
+│   ├── component-alternatives.ts
+│   ├── openrouter.ts
+│   ├── quote-selection.ts       # Armados y comprobaciones técnicas
+│   └── store-offers.ts          # Ofertas y agrupación de compras
+└── types/pc-builder.ts
+```
+
+## Evolución prevista
+
+- Conectores para APIs de tiendas y sus propios inventarios.
+- Espacios de trabajo por empresa, con autenticación y configuración de su catálogo.
+- Métricas para evaluar el tiempo de cotización, las selecciones válidas y la continuación hacia la compra.
+
+## Autor y origen
+
+Desarrollado por **[Vicente Sampson](https://github.com/ElVichicho)**. El proyecto nació en la asignatura Aplicaciones de Inteligencia Artificial de Ingeniería en Informática y continúa como proyecto de portafolio orientado a un producto SaaS.
+
+Los productos, ofertas y benchmarks de la demo proceden de [SoloTodo](https://www.solotodo.cl/). La inferencia se realiza mediante [OpenRouter](https://openrouter.ai/).
