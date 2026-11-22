@@ -96,9 +96,13 @@ export function createDailyCatalog(deps: Dependencies) {
 }
 
 function redisCommand(): RedisCommand | undefined {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-  if (!url || !token) return;
+  const configured = [
+    { url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN },
+    { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN },
+  ].find(({url,token}) => url?.trim() && token?.trim());
+  if (!configured?.url || !configured.token) return;
+  const url = configured.url.trim();
+  const token = configured.token.trim();
   return async command => {
     const response = await fetch(url, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

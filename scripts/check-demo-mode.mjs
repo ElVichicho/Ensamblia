@@ -11,6 +11,7 @@ const filters={budgetCLP:1800000,useCase:'gaming',cpuPreference:'any',gpuPrefere
 async function send(body){const r=await POST(new NextRequest('http://localhost/api/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()};}
 try{
   delete process.env.UPSTASH_REDIS_REST_URL;delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  delete process.env.KV_REST_API_URL;delete process.env.KV_REST_API_TOKEN;
   process.env.VERCEL='1';process.env.VERCEL_ENV='production';process.env.VERCEL_GIT_COMMIT_REF='preview';
   process.env.ENSAMBLIA_QUOTE_MODE='ai';process.env.OPENROUTER_API_KEY='dummy-key-must-not-be-used';
   assert.equal(quoteMode(),'demo');

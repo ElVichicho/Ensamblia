@@ -58,3 +58,36 @@ store.set(`crash:attempt:${catalogDay(now)}`,'dead-worker');
 const abandoned=await createDailyCatalog({...deps,namespace:'crash',now:()=>clock,sleep:async ms=>{clock+=ms}})();
 assert.equal(abandoned.status,'stale');assert.equal(downloads,4);
 console.log('Passed shared daily cache, concurrent instances, Chile/DST boundaries, next-day refresh, provider/storage failures, crash claims and compression checks.');
+// Exercise the HTTP adapter using Vercel's actual variable names. No credentials
+// or external network are needed; the response is a previously refreshed cache.
+const {getDailyCatalog}=loadTypescript('src/lib/daily-catalog.ts');
+const envKeys=['KV_REST_API_URL','KV_REST_API_TOKEN','KV_REST_API_READ_ONLY_TOKEN','UPSTASH_REDIS_REST_URL','UPSTASH_REDIS_REST_TOKEN'];
+const previousEnv=Object.fromEntries(envKeys.map(key=>[key,process.env[key]]));
+const originalFetch=globalThis.fetch;
+try{
+ const cached=encodeCatalog({updatedAt:new Date().toISOString(),products,offers:{}});
+ const cases=[
+  {env:{KV_REST_API_URL:' https://kv.example.test ',KV_REST_API_TOKEN:' kv-write '},url:'https://kv.example.test',token:'kv-write'},
+  {env:{UPSTASH_REDIS_REST_URL:'https://upstash.example.test',UPSTASH_REDIS_REST_TOKEN:'upstash-write'},url:'https://upstash.example.test',token:'upstash-write'},
+  {env:{KV_REST_API_URL:'https://kv.example.test',KV_REST_API_TOKEN:'kv-write',UPSTASH_REDIS_REST_URL:'https://upstash.example.test',UPSTASH_REDIS_REST_TOKEN:'other'},url:'https://kv.example.test',token:'kv-write'},
+  {env:{KV_REST_API_URL:'https://incomplete.example.test',UPSTASH_REDIS_REST_URL:'https://upstash.example.test',UPSTASH_REDIS_REST_TOKEN:'upstash-write'},url:'https://upstash.example.test',token:'upstash-write'},
+  {env:{KV_REST_API_URL:'https://kv.example.test',UPSTASH_REDIS_REST_TOKEN:'must-not-mix'}},
+  {env:{KV_REST_API_URL:'https://kv.example.test',KV_REST_API_READ_ONLY_TOKEN:'readonly-must-not-be-used'}},
+ ];
+ for(const test of cases){
+  for(const key of envKeys)delete process.env[key];
+  Object.assign(process.env,test.env);
+  let requests=0;
+  globalThis.fetch=async(url,init)=>{
+   requests++;assert.equal(url,test.url);assert.equal(init.headers.Authorization,`Bearer ${test.token}`);
+   assert.equal(JSON.parse(init.body)[0],'GET');return Response.json({result:cached});
+  };
+  const result=await getDailyCatalog();
+  assert.equal(result.status,test.url?'current':'unconfigured');
+  assert.equal(requests,test.url?1:0);
+ }
+ console.log('Passed Vercel KV variables, legacy Upstash pairs, precedence, whitespace, incomplete pairs and read-only-token rejection.');
+}finally{
+ globalThis.fetch=originalFetch;
+ for(const key of envKeys){if(previousEnv[key]===undefined)delete process.env[key];else process.env[key]=previousEnv[key];}
+}
