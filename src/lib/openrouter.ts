@@ -1,5 +1,6 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
-import { type Product, QuoteError, selectCandidates, specifications, prepareConfigurations } from "./quote-selection";
+import { type Product, products, QuoteError, selectCandidates, specifications, prepareConfigurations } from "./quote-selection";
+import { relevantProducts, useCaseLabels } from "./catalog-profiles";
 
 export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3.5-lightning:free";
 export const OPENROUTER_RATE_LIMIT_MESSAGE =
@@ -71,6 +72,13 @@ option debe ser un número de las configuraciones proporcionadas. No cambies pie
       const quote:BuildQuote={
         ...config.quote,buildName:result.buildName,executiveSummary:result.summary,
         performanceSummary:result.summary,upgradePath:result.upgradePath,
+        catalogSelection: {
+          useCase:useCaseLabels[filters.useCase], catalogProducts:(catalog ?? products).length,
+          relevantProducts:relevantProducts(catalog ?? products,filters).length,
+          candidateProducts:candidates.length,
+          sentProducts:new Set(configurations.flatMap(config=>config.quote.components.map(item=>item.id))).size,
+          configurations:configurations.length,
+        },
         components:config.quote.components.map(item=>({
           ...item,aiReason:typeof result.reasons?.[item.category]==="string"?result.reasons[item.category]:item.aiReason,
         })),

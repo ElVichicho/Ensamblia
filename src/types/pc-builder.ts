@@ -47,6 +47,23 @@ export interface BuildQuote {
   executiveSummary: string;
   pros: string[];
   upgradePath: string;
+  alternatives?: Partial<Record<ComponentCategory, ComponentAlternative[]>>;
+  catalogSelection?: {
+    useCase: string;
+    catalogProducts: number;
+    relevantProducts: number;
+    candidateProducts: number;
+    sentProducts: number;
+    configurations: number;
+  };
+}
+
+export interface ComponentAlternative {
+  component: ComponentItem;
+  totalCLP: number;
+  priceDifferenceCLP: number;
+  explanation: string;
+  benchmark?: { name: string; score: number; referenceScore: number; percent: number };
 }
 
 export interface BuilderFilters {

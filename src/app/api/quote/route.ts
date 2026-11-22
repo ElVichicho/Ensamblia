@@ -3,7 +3,8 @@ import { BuilderFilters } from "@/types/pc-builder";
 import { getFreeOpenRouterModel, requestBuildFromOpenRouter } from "@/lib/openrouter";
 import { decodeSnapshot, maxSnapshotLength } from "@/lib/catalog-snapshot";
 import { attachStoreOffers } from "@/lib/store-offers";
-import { QuoteError } from "@/lib/quote-selection";
+import { products, QuoteError } from "@/lib/quote-selection";
+import { rebuildSelection, withAlternatives } from "@/lib/component-alternatives";
 
 export const maxDuration = 60;
 export async function POST(req: NextRequest) {
@@ -35,8 +36,13 @@ export async function POST(req: NextRequest) {
     }
   }
   try {
+    if (body.selection !== undefined) {
+      const quote=attachStoreOffers(rebuildSelection(body.selection,filters,snapshot?.products ?? products),filters.consolidateStores ?? false,snapshot?.offers);
+      return NextResponse.json({quote:withAlternatives(quote,filters,snapshot?.products ?? products,snapshot?.offers)});
+    }
     const result = await requestBuildFromOpenRouter(filters,key,getFreeOpenRouterModel(),snapshot?.products);
-    return NextResponse.json({...result,quote:attachStoreOffers(result.quote,filters.consolidateStores ?? false,snapshot?.offers)});
+    const quote=attachStoreOffers(result.quote,filters.consolidateStores ?? false,snapshot?.offers);
+    return NextResponse.json({...result,quote:withAlternatives(quote,filters,snapshot?.products ?? products,snapshot?.offers)});
   } catch (error) {
     console.error("Cotización:",error);
     return NextResponse.json({error:error instanceof QuoteError?error.message:"Ocurrió un error al preparar la cotización."},

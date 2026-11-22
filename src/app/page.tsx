@@ -13,7 +13,7 @@ const initial:BuilderFilters={
   coolingPreference:"air",caseSize:"standard",customInstructions:"",consolidateStores:false,
 };
 
-type SavedCatalog = { token: string; updatedAt: string; count: number };
+type SavedCatalog = { token: string; updatedAt: string; count: number; profiles?: Record<string, number> };
 const catalogKey = "solotodo-catalog-v1";
 
 export default function HomePage(){
@@ -26,6 +26,9 @@ export default function HomePage(){
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [copied,setCopied]=useState(false);
+  const [changing,setChanging]=useState(false);
+  const [comparisonCategory,setComparisonCategory]=useState<ComponentCategory>("cpu");
+  const busy=loading||refreshing||changing;
   useEffect(()=>{
     try {
       const theme=localStorage.getItem("solotodo-theme");
@@ -66,6 +69,7 @@ export default function HomePage(){
     setFilters(current=>({...current,[key]:value}));
   }
   async function generate(){
+    if(busy)return;
     setLoading(true);setError("");setCopied(false);
     try {
       const response=await fetch("/api/quote",{
@@ -77,6 +81,24 @@ export default function HomePage(){
     } catch(e){setError(e instanceof Error?e.message:"No se pudo conectar con el servicio.");}
     finally {setLoading(false);}
   }
+  async function chooseAlternative(category:ComponentCategory,id:string){
+    if(!quote||!submitted||busy)return;
+    const alternative=quote.alternatives?.[category]?.find(option=>option.component.id===id);
+    if(!alternative)return;
+    const selection=quote.components.map(item=>item.category===category?alternative.component:item)
+      .map(({id,category,quantity})=>({id,category,quantity}));
+    setChanging(true);setError("");setCopied(false);
+    try {
+      const response=await fetch("/api/quote",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({filters:submitted,selection,catalogToken:catalog?.token}),
+      });
+      const data=await response.json();
+      if(!response.ok||!data.quote)throw new Error(data.error||"No se pudo aplicar el cambio.");
+      setQuote({...data.quote,catalogSelection:quote.catalogSelection});
+    } catch(error){setError(error instanceof Error?error.message:"No se pudo aplicar el cambio. Tu cotización anterior sigue disponible.");}
+    finally {setChanging(false);}
+  }
   async function copy(){
     if(!quote)return;
     try {
@@ -87,6 +109,7 @@ export default function HomePage(){
   const changed=Boolean(submitted&&JSON.stringify(filters)!==JSON.stringify(submitted));
   const storeCount = new Set(quote?.components.filter(item=>item.storeUrl).map(item=>item.store)).size;
   const missingOffers = quote?.components.filter(item=>!item.storeUrl).length ?? 0;
+  const comparisonOptions=quote?.alternatives?.[comparisonCategory] ?? [];
   return (
     <div className="site">
       <header className="topbar">
@@ -96,7 +119,7 @@ export default function HomePage(){
           <span className="header-title">Cotizador para tu tienda</span>
           <div className="header-actions">
             <a href="https://www.solotodo.cl/" target="_blank" rel="noreferrer" className="catalog-link">Catálogo <ArrowUpRight size={14}/></a>
-            <button type="button" className="catalog-refresh" disabled={loading||refreshing} onClick={()=>void refreshCatalog()}>
+            <button type="button" className="catalog-refresh" disabled={busy} onClick={()=>void refreshCatalog()}>
               <RefreshCw size={14} className={refreshing?"spinner":undefined}/>{refreshing?"Actualizando…":"Actualizar catálogo"}
             </button>
             <button type="button" className="theme-toggle" onClick={toggleTheme}>
@@ -112,6 +135,11 @@ export default function HomePage(){
           {catalogNotice || (catalog ? `Catálogo guardado: ${catalog.count} productos · ${new Date(catalog.updatedAt).toLocaleString("es-CL")}`
             : "Usando precios de referencia. Actualiza el catálogo para consultar ofertas y tiendas.")}
         </p>
+        {catalog&&!catalog.profiles&&<p className="catalog-status">Actualiza el catálogo para cargar la selección ampliada de productos y ver su distribución por uso.</p>}
+        {catalog?.profiles&&<details className="catalog-coverage"><summary>Productos disponibles por uso</summary>
+          <p>Hasta 200 productos por categoría. Un producto puede servir para varios usos.</p>
+          <dl>{uses.map(([id,label])=><div key={id}><dt>{label}</dt><dd>{catalog.profiles?.[id] ?? 0}</dd></div>)}</dl>
+        </details>}
         <div className="page-heading">
           <div><p className="eyebrow">COTIZADOR DE PC</p>
             <h1>Tu próximo PC, <span>pieza por pieza.</span></h1>
@@ -123,7 +151,7 @@ export default function HomePage(){
           <aside className="filter-panel">
             <div className="panel-title"><SlidersHorizontal size={16}/><h2>Configura tu equipo</h2></div>
             <form onSubmit={e=>{e.preventDefault();void generate();}}>
-              <fieldset disabled={loading||refreshing}>
+              <fieldset disabled={busy}>
                 <label className="field-label" htmlFor="use">Uso principal</label>
                 <select id="use" value={filters.useCase} onChange={e=>update("useCase",e.target.value as BuilderFilters["useCase"])}>{uses.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
                 <label className="field-label budget-label" htmlFor="budget">Presupuesto máximo <span>CLP</span></label>
@@ -160,8 +188,8 @@ export default function HomePage(){
               </fieldset>
             </form>
           </aside>
-          <section className="quote-area" aria-busy={loading}>
-            {error&&<div role="alert" className="error-message"><CircleAlert size={18}/><div><strong>No pudimos completar la cotización</strong><p>{error}</p></div><button type="button" disabled={loading||refreshing} onClick={()=>void generate()}>Reintentar</button></div>}
+          <section className="quote-area" aria-busy={loading||changing}>
+            {error&&<div role="alert" className="error-message"><CircleAlert size={18}/><div><strong>No pudimos completar la solicitud</strong><p>{error}</p></div><button type="button" disabled={busy} onClick={()=>void generate()}>Volver a cotizar</button></div>}
             {changed&&<p className="changed-note">Cambiaste las preferencias. Vuelve a cotizar para actualizar las piezas.</p>}
             <div className="quote-sheet">
               <div className="sheet-heading"><div><span className="eyebrow">TU COTIZACIÓN</span><h2>{quote?.buildName||"Lista de componentes"}</h2></div><span className="item-count">{quote?`${quote.components.length} componentes`:"Sin generar"}</span></div>
@@ -172,7 +200,11 @@ export default function HomePage(){
                   return <div className="component-row" key={category}>
                     <div className="component-kind"><Cpu className="component-icon" size={17} strokeWidth={1.5}/><span className="row-number">{String(index+1).padStart(2,"0")}</span><span>{label}</span></div>
                     <div className="product-cell">{item?<><a href={item.affiliateUrl} target="_blank" rel="noreferrer">{item.name}<ArrowUpRight size={13}/></a><p>{item.quantity&&item.quantity>1?`${item.quantity} unidades · `:""}{item.aiReason}</p><p>{item.storeUrl ? <a href={item.storeUrl} target="_blank" rel="noreferrer">{item.store}<ArrowUpRight size={12}/></a> : "Sin oferta verificada · precio referencial"}</p></>:<span className="empty-product">{quote?"Sin pieza adicional":"Por seleccionar"}</span>}</div>
-                    <div className="product-price">{item?money(item.priceCLP):"—"}</div>
+                    <div className="product-price">{item?money(item.priceCLP):"—"}
+                      {item&&quote?.alternatives?.[category]&&<button className="compare-link" type="button" disabled={busy||changed} onClick={()=>{
+                        setComparisonCategory(category);document.getElementById("component-options")?.scrollIntoView({behavior:"smooth",block:"start"});
+                      }}>Ver opciones</button>}
+                    </div>
                   </div>;
                 })}
               </div>
@@ -183,6 +215,35 @@ export default function HomePage(){
             {quote?<div className="quote-details">
               <div className="details-heading"><h3>Observaciones del armado</h3><button onClick={()=>void copy()} className="text-button" type="button">{copied?<Check size={15}/>:<ArrowDownToLine size={15}/>} {copied?"Copiado":"Copiar cotización"}</button></div>
               <p className="summary-text">{quote.executiveSummary}</p>
+              {quote.catalogSelection&&<details className="catalog-coverage"><summary>Datos utilizados para la recomendación inicial</summary>
+                <p>De {quote.catalogSelection.catalogProducts} productos guardados, {quote.catalogSelection.relevantProducts} son pertinentes para {quote.catalogSelection.useCase.toLowerCase()}. Se preseleccionaron {quote.catalogSelection.candidateProducts} según tus preferencias y presupuesto. La IA recibió {quote.catalogSelection.sentProducts} productos distintos, organizados en {quote.catalogSelection.configurations} armados.</p>
+              </details>}
+              {quote.alternatives&&<section className="component-options" id="component-options" aria-labelledby="comparison-title">
+                <h3 id="comparison-title">Compara y elige tus piezas</h3>
+                <p>Hasta tres opciones por categoría que respetan el presupuesto y las comprobaciones disponibles para el resto del armado.</p>
+                <div className="comparison-tabs" aria-label="Categoría a comparar">{rows.filter(([category])=>quote.alternatives?.[category]).map(([category,label])=>
+                  <button type="button" key={category} aria-pressed={comparisonCategory===category} onClick={()=>setComparisonCategory(category)}>{label}</button>
+                )}</div>
+                <div className="alternative-grid">{comparisonOptions.map(option=>{
+                  const selected=quote.components.some(item=>item.id===option.component.id);
+                  return <article className={`alternative-card${selected?" is-selected":""}`} key={option.component.id}>
+                    <h4>{option.component.name}</h4>
+                    <p>{option.explanation}</p>
+                    <strong className="alternative-price">{money(option.component.priceCLP)}{(option.component.quantity ?? 1)>1&&<small> · {option.component.quantity} unidades</small>}</strong>
+                    <p>Total del equipo {money(option.totalCLP)}</p>
+                    <p>{selected?"Precio de referencia para comparar":`${option.priceDifferenceCLP>0?"+":"−"}${money(Math.abs(option.priceDifferenceCLP))} en el total del equipo`}</p>
+                    <div className="alternative-metric">{option.benchmark?<>
+                      <strong>{selected?"Referencia":`${option.benchmark.percent>0?"+":""}${option.benchmark.percent.toLocaleString("es-CL")}%`}</strong>
+                      <span>{option.benchmark.name} · {option.benchmark.score.toLocaleString("es-CL")} puntos</span>
+                      {!selected&&<small>respecto de la pieza seleccionada</small>}
+                    </>:<span>Compara las características y el costo.</span>}</div>
+                    <button type="button" disabled={busy||changed||selected} onClick={()=>void chooseAlternative(comparisonCategory,option.component.id)}>{selected?"Seleccionada":"Elegir esta pieza"}</button>
+                  </article>;
+                })}</div>
+                {comparisonOptions.length<3&&<p className="comparison-note">El catálogo y tus requisitos permiten {comparisonOptions.length} {comparisonOptions.length===1?"opción":"opciones"} para esta categoría manteniendo las demás piezas.</p>}
+                <p className="comparison-note">Los porcentajes comparan puntuaciones de benchmarks del catálogo. El rendimiento real depende de la tarea. El total puede cambiar al reagrupar las ofertas de las tiendas.</p>
+                <p className="comparison-note" role="status">{changing?"Aplicando la pieza y recalculando compatibilidad, ofertas y alternativas…":""}</p>
+              </section>}
               <dl className="check-list">{quote.compatibilityChecks.map((check,i)=><div key={i}><dt>{check.status==="valid"?<Check size={14}/>:<CircleAlert size={14}/>} {check.title}</dt><dd>{check.detail}</dd></div>)}</dl>
               <div className="upgrade-note"><strong>Para más adelante</strong><p>{quote.upgradePath}</p></div>
             </div>:<div className="empty-note"><h3>Tu presupuesto, pieza por pieza.</h3><p>Indica el uso, el monto máximo y las capacidades que necesitas. Aquí podrás revisar productos, cantidades y costo total antes de visitar las tiendas.</p></div>}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { encodeSnapshot, refreshSnapshot } from "@/lib/catalog-snapshot";
+import { createProfileIndex } from "@/lib/catalog-profiles";
 
 export const maxDuration = 60;
 export async function POST() {
@@ -9,6 +10,7 @@ export async function POST() {
     const snapshot = await refreshSnapshot();
     return NextResponse.json({
       token:encodeSnapshot(snapshot,key),updatedAt:snapshot.updatedAt,count:snapshot.products.length,
+      profiles:Object.fromEntries(Object.entries(createProfileIndex(snapshot.products)).map(([useCase,ids])=>[useCase,ids.length])),
     });
   } catch (error) {
     console.warn("Actualización de catálogo:",error);

@@ -1,10 +1,12 @@
 import { BuildQuote, BuilderFilters, ComponentCategory, ComponentItem, CompatibilityCheck } from "@/types/pc-builder";
 import rawCatalog from "@/data/solotodo-catalog.json";
+import { relevantProducts } from "./catalog-profiles";
 
 export interface Product {
   id: number; name: string; category: ComponentCategory; brand: string | null;
   priceCLP: number; solotodoUrl: string; socket: string | null; tdp: number | null;
   format: string | null; store: string; specs: Record<string, unknown>;
+  useCases?: BuilderFilters["useCase"][];
 }
 export const products = Object.values(rawCatalog.categories).flat() as unknown as Product[];
 export const categories: ComponentCategory[] = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "case", "cooler"];
@@ -48,14 +50,14 @@ export function specifications(p: Product) {
   }
 }
 
-function matches(p: Product, f: BuilderFilters) {
+export function matches(p: Product, f: BuilderFilters) {
   if (p.category === "cpu" && f.cpuPreference !== "any" && p.brand?.toLowerCase() !== f.cpuPreference) return false;
   if (p.category === "psu" && num(p,"certification_value") < 2) return false;
   if (p.category === "gpu" && f.gpuPreference !== "any") {
-    const isNvidia = /geforce|nvidia/i.test(p.name);
-    if ((f.gpuPreference === "nvidia") !== isNvidia) return false;
+    if (f.gpuPreference === "nvidia" && !/geforce|nvidia/i.test(p.name)) return false;
+    if (f.gpuPreference === "amd" && !/radeon|amd/i.test(p.name)) return false;
   }
-  if (p.category === "ram" && (str(p,"bus_bus_bus_format_name") !== "DIMM" || p.specs.is_ecc === true || p.specs.is_fully_buffered === true || ramGB(p) * 2 < capacity(f.ramCapacity))) return false;
+  if (p.category === "ram" && (str(p,"bus_bus_bus_format_name") !== "DIMM" || p.specs.is_ecc === true || p.specs.is_fully_buffered === true || ramGB(p) * 4 < capacity(f.ramCapacity))) return false;
   if (p.category === "storage") {
     if (num(p,"capacity_value") < capacity(f.storageCapacity)) return false;
     const sata = /sata/i.test(str(p,"ssd_type_bus_bus_with_version_bus_name"));
@@ -71,12 +73,13 @@ function matches(p: Product, f: BuilderFilters) {
 }
 
 export function selectCandidates(f: BuilderFilters, catalog: Product[] = products): Product[] {
+  const relevant = relevantProducts(catalog, f);
   const shares: Record<ComponentCategory, number> = {
     cpu: f.useCase === "gaming" ? .2 : .28, gpu: .38, motherboard: .12,
     ram: .1, storage: .1, psu: .06, case: .05, cooler: .04,
   };
   return categories.flatMap(category => {
-    const pool = catalog.filter(p => p.category === category && p.priceCLP > 0 && p.priceCLP < f.budgetCLP * .65 && matches(p, f));
+    const pool = relevant.filter(p => p.category === category && p.priceCLP > 0 && p.priceCLP < f.budgetCLP * .65 && matches(p, f));
     const target = f.budgetCLP * shares[category];
     const tier = category === "cpu" || category === "gpu" ? pool.filter(p=>p.priceCLP >= target * .45) : pool;
     const eligible = tier.length ? tier : pool;
@@ -117,6 +120,7 @@ export function createQuote(content: string, f: BuilderFilters, candidates: Prod
     const source = candidates.find(p=>String(p.id)===String(choice?.id) && p.category===category);
     const quantity = Number(choice.quantity ?? 1);
     if (!source || typeof choice.reason !== "string") throw new QuoteError(`ID o motivo inválido en ${category}.`);
+    if (!matches(source, f)) throw new QuoteError(`La pieza de ${labels[source.category]} no cumple las preferencias.`);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > (category === "ram" ? 4 : 1)) {
       throw new QuoteError("La cantidad de módulos de RAM debe ser un entero entre 1 y 4.");
     }
@@ -134,14 +138,22 @@ export function createQuote(content: string, f: BuilderFilters, candidates: Prod
   }
   const cpu=chosen.get("cpu")!.p, board=chosen.get("motherboard")!.p, ram=chosen.get("ram")!, storage=chosen.get("storage")!.p;
   const gpu=chosen.get("gpu")?.p, psu=chosen.get("psu")!.p, chasis=chosen.get("case")!.p, cooler=chosen.get("cooler")?.p;
-  if ((f.useCase === "gaming" || /no posee/i.test(str(cpu,"graphics_name"))) && !gpu) throw new QuoteError("Este equipo requiere una tarjeta de video.");
+  if ((f.useCase === "gaming" || f.gpuPreference !== "any" || /no posee/i.test(str(cpu,"graphics_name"))) && !gpu) throw new QuoteError("Este equipo requiere una tarjeta de video.");
   if (/no posee/i.test(str(cpu,"cooler_name")) && !cooler) throw new QuoteError("Este procesador requiere un cooler adicional.");
+  if (f.coolingPreference === "liquid" && !cooler) throw new QuoteError("Se requiere refrigeración líquida.");
   if (cpu.socket && board.socket && normalize(cpu.socket)!==normalize(board.socket)) throw new QuoteError("CPU y placa madre deben compartir socket.");
   const ramType=memoryType(ram.p), boardType=memoryType(board);
   if (ramType && boardType && ramType!==boardType) throw new QuoteError("RAM y placa madre deben compartir DDR4 o DDR5.");
   if (ramGB(ram.p)*ram.quantity < capacity(f.ramCapacity)) throw new QuoteError("La cantidad total de RAM es menor a la solicitada.");
   if (num(ram.p,"capacity_dimm_quantity_value")*ram.quantity > num(board,"memory_slots_quantity")) throw new QuoteError("Los módulos exceden las ranuras de RAM.");
   if (num(storage,"capacity_value") < capacity(f.storageCapacity)) throw new QuoteError("El almacenamiento es menor al solicitado.");
+  const boardHeight=num(board,"format_format_height"), boardWidth=num(board,"format_format_width");
+  const caseHeight=num(chasis,"largest_motherboard_format_format_height"), caseWidth=num(chasis,"largest_motherboard_format_format_width");
+  if ((boardHeight && caseHeight && boardHeight>caseHeight) || (boardWidth && caseWidth && boardWidth>caseWidth)) throw new QuoteError("La placa madre no cabe en el gabinete.");
+  if (cooler) {
+    const sockets=(specifications(cooler) as {sockets:string[]}).sockets;
+    if (sockets.length && cpu.socket && !sockets.some(socket=>normalize(socket)===normalize(cpu.socket!))) throw new QuoteError("El cooler no admite el socket del procesador.");
+  }
   const checks: CompatibilityCheck[] = [
     {title:"Socket",status:cpu.socket&&board.socket?"valid":"warning",detail:cpu.socket&&board.socket?`${cpu.socket} en CPU y placa madre.`:"Socket pendiente de verificar."},
     {title:"Memoria",status:ramType&&boardType?"valid":"warning",detail:`${ramGB(ram.p)*ram.quantity} GB ${ramType}. ${ram.quantity} unidad(es) del producto seleccionado.`},
@@ -176,8 +188,9 @@ export function prepareConfigurations(f: BuilderFilters, candidates: Product[]):
   const maxGpu = Math.max(1,...of("gpu").map(p=>num(p,"gpu_tdmark_time_spy_score")));
   for (const cpu of of("cpu")) {
     const boards=of("motherboard").filter(p=>cpu.socket && p.socket && normalize(cpu.socket)===normalize(p.socket) && p.priceCLP >= cpu.priceCLP*.25).slice(0,5);
-    const needsGpu=f.useCase==="gaming" || /no posee/i.test(str(cpu,"graphics_name"));
-    const gpuOptions: (Product|undefined)[]=needsGpu?of("gpu"):[undefined,...of("gpu")];
+    const needsGpu=f.useCase==="gaming" || f.gpuPreference!=="any" || /no posee/i.test(str(cpu,"graphics_name"));
+    const lightweight=f.useCase==="office" || f.useCase==="home_study";
+    const gpuOptions: (Product|undefined)[]=needsGpu?of("gpu"):lightweight?[undefined]:[undefined,...of("gpu")];
     for (const board of boards) {
       const ramOptions=of("ram").filter(p=>memoryType(p)===memoryType(board)).map(p=>({
         p,quantity:Math.max(1,Math.ceil(capacity(f.ramCapacity)/ramGB(p))),

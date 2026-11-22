@@ -1,17 +1,6 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
-import ts from "typescript";
-
-const require = createRequire(import.meta.url);
-const source = fs.readFileSync("src/lib/quote-selection.ts", "utf8");
-const compiled = ts.transpileModule(source, { compilerOptions: { esModuleInterop: true, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-const compiledModule = { exports: {} };
-new Function("require", "module", "exports", compiled)(
-  id => id.startsWith("@/") ? require(path.resolve("src", id.slice(2))) : require(id),
-  compiledModule, compiledModule.exports,
-);
+import { loadTypescript } from "./load-typescript.mjs";
+const compiledModule = { exports: loadTypescript("src/lib/quote-selection.ts") };
 const { selectCandidates, createQuote } = compiledModule.exports;
 const base = {
   budgetCLP: 500000, useCase: "gaming", cpuPreference: "any", gpuPreference: "any",
@@ -37,7 +26,7 @@ const fixture = categories.map((category,i)=>({
     graphics_name:"No posee",cooler_name:"No posee",tdp:65,
     memory_slots_mtype_itype_type_name:"DDR5",bus_bus_bus_type_name:"DDR5",
     capacity_total_capacity_value:8192,capacity_dimm_quantity_value:1,memory_slots_quantity:4,
-    capacity_value:1000,power_value:750,gpu_tdp:100,
+    capacity_value:1000,power_value:750,gpu_tdp:100,certification_value:3,bus_bus_bus_format_name:"DIMM",
   },
 }));
 const selection = Object.fromEntries(fixture.map(p=>[p.category,{id:p.id,quantity:p.category==="ram"?2:1,reason:"Test"}]));
