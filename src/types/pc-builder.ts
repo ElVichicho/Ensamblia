@@ -32,6 +32,7 @@ export interface CompatibilityCheck {
 }
 
 export interface BuildQuote {
+  generationMode?: 'demo' | 'ai';
   buildName: string;
   targetUse: string;
   totalBudgetCLP: number;

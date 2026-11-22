@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { encodeSnapshot, refreshSnapshot } from "@/lib/catalog-snapshot";
+import { catalogSigningKey, encodeSnapshot, refreshSnapshot } from "@/lib/catalog-snapshot";
 import { createProfileIndex } from "@/lib/catalog-profiles";
 
 export const maxDuration = 60;
 export async function POST() {
-  const key = process.env.OPENROUTER_API_KEY?.trim();
-  if (!key) return NextResponse.json({error:"Falta configurar el servicio."},{status:503});
+  const key = catalogSigningKey();
+  if (!key) return NextResponse.json({error:"Configura CATALOG_SIGNING_SECRET en el servidor para actualizar el catálogo."},{status:503});
   try {
     const snapshot = await refreshSnapshot();
     return NextResponse.json({

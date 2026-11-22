@@ -19,6 +19,8 @@ El producto está orientado a evolucionar como un **SaaS para tiendas de tecnolo
 
 **[Probar la demo](https://ensamblia.vercel.app)**
 
+**Demo pública sin IA.** Las cotizaciones se calculan mediante reglas del catálogo, presupuesto y compatibilidad. Puedes explorar las alternativas y cambiar piezas con cero solicitudes a OpenRouter.
+
 ![Comparación de procesadores con precios, alternativas y diferencias de benchmarks en Ensamblia](public/ensamblia-preview.jpg)
 
 ## Funciones
@@ -35,16 +37,16 @@ El producto está orientado a evolucionar como un **SaaS para tiendas de tecnolo
 1. **Obtención de datos.** El catálogo de referencia permite iniciar la aplicación. Una actualización manual consulta SoloTodo y guarda en el navegador una copia comprimida y firmada por el servidor.
 2. **Selección por contexto.** Las reglas clasifican los productos por uso y filtran según presupuesto y preferencias. Un producto puede pertenecer a varios perfiles.
 3. **Preparación del armado.** El servidor genera hasta ocho configuraciones con las comprobaciones técnicas disponibles.
-4. **Recomendación con IA.** OpenRouter recibe las configuraciones preparadas. El modelo selecciona una opción y redacta su explicación. Los precios y las piezas se recuperan del catálogo.
+4. **Selección de demostración.** El servidor elige una de las configuraciones preparadas según las puntuaciones del catálogo. El endpoint público utiliza este motor de reglas para preservar la cuota del proveedor de IA.
 5. **Personalización.** El servidor calcula alternativas por categoría. Al cambiar una pieza, vuelve a validar el armado y recalcula ofertas, total y comparaciones utilizando la copia guardada.
 
-Los cambios de componentes reutilizan las reglas del servidor y evitan una nueva consulta al modelo.
+La integración con OpenRouter se conserva en `src/lib/openrouter.ts`. La demo pública genera el armado inicial y los cambios de componentes con el motor de reglas.
 
 ## Datos y comparaciones
 
 El catálogo de referencia incluido contiene **1.511 productos en ocho categorías**, con un máximo de **200 por categoría**. La cantidad disponible puede variar al actualizar las ofertas.
 
-La selección por contexto reduce los datos enviados a la IA. Por ejemplo, las reglas de oficina excluyen productos de alto consumo o de estaciones de trabajo cuando sus características quedan fuera del perfil. Después se aplican las preferencias y el presupuesto para preparar las configuraciones.
+La selección por contexto reduce los productos utilizados para preparar los armados. Por ejemplo, las reglas de oficina excluyen productos de alto consumo o de estaciones de trabajo cuando sus características quedan fuera del perfil. Después se aplican las preferencias y el presupuesto para preparar las configuraciones.
 
 Los porcentajes de CPU y GPU se calculan en el servidor con esta fórmula:
 
@@ -62,34 +64,36 @@ Las comprobaciones abarcan socket, tipo y cantidad de RAM, dimensiones conocidas
 | --- | --- |
 | Interfaz | Next.js 16, React 19, TypeScript, Tailwind CSS 4 y Lucide |
 | Servidor | Route Handlers de Next.js y reglas de selección y compatibilidad |
-| IA | OpenRouter, con NVIDIA Nemotron 3.5 Lightning gratuito como modelo predeterminado |
+| IA | Integración con OpenRouter y NVIDIA Nemotron 3.5 Lightning. La demo pública utiliza reglas |
 | Datos | API pública de SoloTodo, catálogo JSON y copias comprimidas con firma HMAC |
 | Despliegue | Vercel conectado al repositorio de GitHub |
 
 ## Ejecutar en local
 
-Necesitas Node.js 22, npm y una API key de OpenRouter.
+Necesitas Node.js 22 y npm.
 
 ```bash
 git clone https://github.com/ElVichicho/Ensamblia.git
 cd Ensamblia
 npm ci
-```
-
-Crea un archivo `.env.local` en la raíz del proyecto:
-
-```dotenv
-OPENROUTER_API_KEY=tu_clave_de_openrouter
-OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free
-```
-
-La clave se utiliza en el servidor para consultar el modelo y firmar las copias del catálogo. El modelo predeterminado es gratuito y está sujeto a los límites y la disponibilidad del proveedor.
-
-```bash
 npm run dev
 ```
 
-Abre [localhost:3000](http://localhost:3000). Puedes pulsar **Actualizar catálogo** para cargar ofertas recientes y sus tiendas.
+Abre [localhost:3000](http://localhost:3000). El catálogo de referencia permite probar el cotizador y sus alternativas.
+
+Para habilitar también el botón **Actualizar catálogo**, genera un secreto para firmar las copias:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Guarda el valor generado en un archivo `.env.local` en la raíz del proyecto y reinicia el servidor:
+
+```dotenv
+CATALOG_SIGNING_SECRET=pega_aqui_el_valor_generado
+```
+
+En Vercel, configura esta variable en el entorno de producción y vuelve a desplegar. Los despliegues anteriores pueden seguir firmando con `OPENROUTER_API_KEY` hasta configurar el secreto independiente. Al cambiar el secreto, actualiza el catálogo para renovar la copia guardada.
 
 ## Comprobaciones y comandos
 
@@ -98,10 +102,11 @@ npm run lint
 npx tsc --noEmit
 node scripts/check-quote-selection.mjs
 node scripts/check-component-alternatives.mjs
+node scripts/check-demo-mode.mjs
 npm run build
 ```
 
-Las comprobaciones cubren presupuestos, selección de candidatos, cantidades de RAM, compatibilidad de los cambios, cálculo de porcentajes, datos faltantes, agrupación de tiendas y filtrado por uso. La prueba de integración con OpenRouter utiliza una respuesta simulada para verificar el contenido enviado al modelo.
+Las comprobaciones cubren presupuestos, selección de candidatos, cantidades de RAM, compatibilidad de los cambios, cálculo de porcentajes, datos faltantes, agrupación de tiendas y filtrado por uso. La prueba de integración con OpenRouter utiliza una respuesta simulada para verificar el contenido enviado al modelo. La prueba de modo demo comprueba que el endpoint público, las peticiones que intentan activar IA y los cambios de piezas realizan cero llamadas de red.
 
 Para actualizar el catálogo de referencia del repositorio:
 
@@ -132,6 +137,7 @@ src/
 
 ## Evolución prevista
 
+- Acceso autenticado a la generación con IA y control de cuota por empresa.
 - Conectores para APIs de tiendas y sus propios inventarios.
 - Espacios de trabajo por empresa, con autenticación y configuración de su catálogo.
 - Métricas para evaluar el tiempo de cotización, las selecciones válidas y la continuación hacia la compra.
@@ -140,4 +146,4 @@ src/
 
 Desarrollado por **[Vicente Sampson](https://github.com/ElVichicho)**. El proyecto nació en la asignatura Aplicaciones de Inteligencia Artificial de Ingeniería en Informática y continúa como proyecto de portafolio orientado a un producto SaaS.
 
-Los productos, ofertas y benchmarks de la demo proceden de [SoloTodo](https://www.solotodo.cl/). La inferencia se realiza mediante [OpenRouter](https://openrouter.ai/).
+Los productos, ofertas y benchmarks de la demo proceden de [SoloTodo](https://www.solotodo.cl/). El código de integración de IA utiliza [OpenRouter](https://openrouter.ai/).

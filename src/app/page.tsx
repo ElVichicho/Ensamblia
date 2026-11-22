@@ -147,6 +147,7 @@ export default function HomePage(){
           </div>
           <div className="heading-aside"><Cpu size={40} strokeWidth={1}/><span>La configuración empieza contigo.</span><small>Precios en pesos chilenos · CLP</small></div>
         </div>
+        <div className="demo-notice" role="note"><strong>Demo interactiva sin IA</strong><p>Explora el cotizador, compara alternativas y cambia las piezas. La selección se calcula con reglas del catálogo y consume cero solicitudes de OpenRouter.</p></div>
         <div className="builder-layout">
           <aside className="filter-panel">
             <div className="panel-title"><SlidersHorizontal size={16}/><h2>Configura tu equipo</h2></div>
@@ -181,10 +182,8 @@ export default function HomePage(){
                   <select id="size" value={filters.caseSize} onChange={e=>update("caseSize",e.target.value as BuilderFilters["caseSize"])}><option value="standard">Estándar</option><option value="compact">Compacto</option><option value="any">Sin preferencia</option></select>
                   <label className="checkbox-label"><input type="checkbox" checked={filters.wifiRequired} onChange={e=>update("wifiRequired",e.target.checked)}/>WiFi integrado en placa</label>
                 </details>
-                <label className="field-label" htmlFor="notes">Otros requisitos <span>Opcional</span></label>
-                <textarea id="notes" rows={3} maxLength={1000} placeholder="Programas, juegos o necesidades de tu equipo…" value={filters.customInstructions} onChange={e=>update("customInstructions",e.target.value)}/>
-                <button className="primary-button" type="submit">{loading?<><LoaderCircle className="spinner" size={16}/>Preparando cotización…</>:"Cotizar equipo"}</button>
-                <p className="form-footnote">La selección usa IA. Revisa las observaciones antes de comprar.</p>
+                <button className="primary-button" type="submit">{loading?<><LoaderCircle className="spinner" size={16}/>Calculando armado…</>:"Cotizar equipo"}</button>
+                <p className="form-footnote">Demo con reglas del catálogo. Revisa las observaciones antes de comprar.</p>
               </fieldset>
             </form>
           </aside>
@@ -216,7 +215,7 @@ export default function HomePage(){
               <div className="details-heading"><h3>Observaciones del armado</h3><button onClick={()=>void copy()} className="text-button" type="button">{copied?<Check size={15}/>:<ArrowDownToLine size={15}/>} {copied?"Copiado":"Copiar cotización"}</button></div>
               <p className="summary-text">{quote.executiveSummary}</p>
               {quote.catalogSelection&&<details className="catalog-coverage"><summary>Datos utilizados para la recomendación inicial</summary>
-                <p>De {quote.catalogSelection.catalogProducts} productos guardados, {quote.catalogSelection.relevantProducts} son pertinentes para {quote.catalogSelection.useCase.toLowerCase()}. Se preseleccionaron {quote.catalogSelection.candidateProducts} según tus preferencias y presupuesto. La IA recibió {quote.catalogSelection.sentProducts} productos distintos, organizados en {quote.catalogSelection.configurations} armados.</p>
+                <p>De {quote.catalogSelection.catalogProducts} productos guardados, {quote.catalogSelection.relevantProducts} son pertinentes para {quote.catalogSelection.useCase.toLowerCase()}. Se preseleccionaron {quote.catalogSelection.candidateProducts} según tus preferencias y presupuesto. {quote.generationMode==="demo"?`El motor de demostración comparó ${quote.catalogSelection.configurations} armados mediante reglas del catálogo.`:`La IA recibió ${quote.catalogSelection.sentProducts} productos distintos, organizados en ${quote.catalogSelection.configurations} armados.`}</p>
               </details>}
               {quote.alternatives&&<section className="component-options" id="component-options" aria-labelledby="comparison-title">
                 <h3 id="comparison-title">Compara y elige tus piezas</h3>
@@ -247,7 +246,7 @@ export default function HomePage(){
               <dl className="check-list">{quote.compatibilityChecks.map((check,i)=><div key={i}><dt>{check.status==="valid"?<Check size={14}/>:<CircleAlert size={14}/>} {check.title}</dt><dd>{check.detail}</dd></div>)}</dl>
               <div className="upgrade-note"><strong>Para más adelante</strong><p>{quote.upgradePath}</p></div>
             </div>:<div className="empty-note"><h3>Tu presupuesto, pieza por pieza.</h3><p>Indica el uso, el monto máximo y las capacidades que necesitas. Aquí podrás revisar productos, cantidades y costo total antes de visitar las tiendas.</p></div>}
-            <div aria-live="polite" className="request-status">{loading?"Preparando la selección con el catálogo guardado. Puede tardar hasta 50 segundos.":""}</div>
+            <div aria-live="polite" className="request-status">{loading?"Calculando la demostración con el catálogo guardado…":""}</div>
           </section>
         </div>
       </main>
