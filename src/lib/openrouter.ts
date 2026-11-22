@@ -42,7 +42,7 @@ option debe ser un número de las configuraciones proporcionadas. No cambies pie
     try {
       const response=await fetch("https://openrouter.ai/api/v1/chat/completions",{
         method:"POST",headers:{Authorization:`Bearer ${token.trim()}`,"Content-Type":"application/json",
-          "HTTP-Referer":"https://solotodo-aiproject.vercel.app","X-Title":"SoloTodo Cotizador"},
+          "HTTP-Referer":"https://ensamblia.vercel.app","X-Title":"Ensamblia"},
         body:JSON.stringify({model:modelName,messages,temperature:0.1,max_tokens:1500,
           ...(modelName===DEFAULT_OPENROUTER_MODEL&&{reasoning:{enabled:false}})}),
         signal:AbortSignal.timeout(Math.min(30000,remaining)),

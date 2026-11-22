@@ -69,8 +69,8 @@ El proyecto consiste en integrar un **asistente de venta consultiva basado en mo
 
 1. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/ElVichicho/SoloTodo-AI-Project.git
-   cd SoloTodo-AI-Project/solotodo-ai
+   git clone https://github.com/ElVichicho/Ensamblia.git
+   cd Ensamblia
    ```
 
 2. **Instalar dependencias:**
