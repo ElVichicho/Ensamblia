@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { loadTypescript } from "./load-typescript.mjs";
+const {filterCatalogue}=loadTypescript("src/lib/catalogue-filters.ts");
+const base={brand:"AMD",category:"cpu",categoryLabel:"Procesadores",features:["AM5"],referenceUrl:"https://example.com/product",referencePrice:90};
+const products=[{...base,id:1,name:"Ryzen básico",offers:[{companyId:"a",companyName:"A",priceCLP:100,url:"https://example.com/a"},{companyId:"b",companyName:"B",priceCLP:180,url:"https://example.com/b"}]},{...base,id:2,name:"Ryzen avanzado",offers:[{companyId:"b",companyName:"B",priceCLP:150,url:"https://example.com/2"}]},{...base,id:3,name:"Sin oferta",category:"ram",offers:[]}];
+const defaults={query:"",category:"",companyIds:[],sort:"price-asc"};
+assert.equal(filterCatalogue(products,defaults).length,3);
+assert.deepEqual(filterCatalogue(products,{...defaults,companyIds:["b"]}).map(p=>[p.id,p.displayPrice]),[[2,150],[1,180]],"El precio y orden deben corresponder a la tienda elegida");
+assert.equal(filterCatalogue(products,{...defaults,companyIds:["a"]})[0].visibleOffers.length,1);
+assert.deepEqual(filterCatalogue(products,{...defaults,query:"BASICO am5"}).map(p=>p.id),[1],"Búsqueda sin tildes y con múltiples palabras");
+assert.equal(filterCatalogue(products,{...defaults,category:"ram"})[0].displayPrice,90);
+assert.equal(filterCatalogue(products,{...defaults,query:"inexistente"}).length,0);
+assert.deepEqual(filterCatalogue(products,{...defaults,sort:"price-desc"}).map(p=>p.id),[2,1,3]);
+assert.equal(products[0].offers.length,2,"Filtrar no modifica las ofertas originales");
+console.log("Catálogo: filtros, búsqueda, precios por tienda, orden y referencias correctos.");

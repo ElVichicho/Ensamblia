@@ -2,6 +2,11 @@
 
 ## Sin publicar
 
+- Catálogo de componentes en `/catalogo`, con búsqueda, categorías, tiendas, comparación de ofertas y paginación; usa exclusivamente los datos guardados.
+- Franja de tiendas continua con pausa y movimiento reducido, e ilustración del PC con geometría corregida.
+- Inicio sin pantalla de carga global; cotizador y catálogo muestran su estructura mientras esperan los datos.
+- Las próximas sincronizaciones guardan las imágenes de productos del proveedor.
+
 - El inicio muestra Pulso desde la primera respuesta; solo las tiendas esperan al catálogo, sin pantalla completa de carga.
 
 - Publicación compatible con `safeupdate`, diagnóstico sin secretos y vigencia de recuperaciones anteriores al horario diario.

@@ -7,6 +7,7 @@ export interface Product {
   priceCLP: number; solotodoUrl: string; socket: string | null; tdp: number | null;
   format: string | null; store: string; specs: Record<string, unknown>;
   useCases?: BuilderFilters["useCase"][];
+  imageUrl?: string;
 }
 export const products = Object.values(rawCatalog.categories).flat() as unknown as Product[];
 export const categories: ComponentCategory[] = ["cpu", "motherboard", "ram", "gpu", "storage", "psu", "case", "cooler"];
