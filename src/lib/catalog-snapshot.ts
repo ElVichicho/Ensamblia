@@ -10,7 +10,7 @@ export const productsPerCategory = 200;
 
 export type Snapshot = { updatedAt: string; products: Product[]; offers: Record<string, Offer[]> };
 type BrowseProduct = {
-  id:number; name:string; category_id:number; brand?:{name:string}; specs?:Record<string,unknown>;
+  id:number; name:string; category_id:number; brand?:{name:string}; specs?:Record<string,unknown>; picture_url?:string;
 };
 
 function compact(value: unknown): unknown {
@@ -39,6 +39,7 @@ export async function refreshSnapshot(): Promise<Snapshot> {
           const format = specs.format_format_name || specs.format_name;
           entries.set(p.id,{
             id:p.id,name:p.name,category,brand:p.brand?.name ?? null,priceCLP:0,
+            ...(p.picture_url?.startsWith("https://media.solotodo.com/")?{imageUrl:p.picture_url}:{}),
             solotodoUrl:`https://www.solotodo.cl/products/${p.id}`,socket:typeof socket==="string"?socket:null,
             tdp:Number(specs.tdp)||null,format:typeof format==="string"?format:null,store:"Sin oferta verificada",specs,
           });
