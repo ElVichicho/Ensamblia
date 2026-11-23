@@ -22,7 +22,7 @@ function compact(value: unknown): unknown {
 }
 
 export async function refreshSnapshot(): Promise<Snapshot> {
-  const signal = AbortSignal.timeout(45000);
+  const signal = AbortSignal.timeout(120000);
   const products: Product[] = [];
   for (const group of [categories.slice(0,4),categories.slice(4)]) {
     const batches = await Promise.all(group.map(async ([id,category])=>{

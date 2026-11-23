@@ -1,51 +1,52 @@
-# Despliegue y catálogo diario
+# Operación de Ensamblia en Vercel y Supabase
 
-## Configuración en Vercel
+## Variables y entornos
 
-1. En Settings → Git, conserva `main` como Production Branch. Publica producción integrando PRs en `main`, para que Vercel compile con las variables de Production.
-2. En Storage/Marketplace, conecta una base Redis de Upstash al proyecto. Usa la misma base en Production y Preview. La app utiliza directamente `KV_REST_API_URL` y `KV_REST_API_TOKEN`, creadas por la integración, sin copiar ni duplicar valores. Se necesita el token de lectura y escritura, no `KV_REST_API_READ_ONLY_TOKEN`. También se admite una pareja completa `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` para instalaciones existentes; la pareja `KV_` tiene prioridad y no se mezclan credenciales entre parejas.
-3. Usa `CATALOG_CACHE_NAMESPACE=ensamblia:catalog:v1` en ambos entornos. Este prefijo identifica la caché; cambiarlo crea otra caché y permite una descarga nueva. En pruebas locales con API real, usa otra base o prefijo para preservar la caché publicada.
-4. En Environment Variables, elimina `OPENROUTER_API_KEY` de Production y Development si no la necesitas allí. En Production deja `ENSAMBLIA_QUOTE_MODE=demo` o sin definir. El código fuerza demo en Production.
-5. Agrega `OPENROUTER_API_KEY` y `ENSAMBLIA_QUOTE_MODE=ai` únicamente a Preview con alcance a la rama `preview`. Opcionalmente configura `OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free` en el mismo alcance. El código solo acepta modelos terminados en `:free`.
-6. En Deployment Protection, activa Vercel Authentication para Preview. Conserva accesible el dominio público de Production. Comprueba la protección desde una sesión sin autenticar antes de usar la clave. La clave es de servidor y nunca lleva prefijo `NEXT_PUBLIC_`.
-7. Despliega la rama `preview`. Vercel genera una URL por rama distinta de `ensamblia.vercel.app`; copia la que aparece en el despliegue, sin deducirla del nombre del proyecto. Si tienes un dominio propio, puedes asignar un subdominio a esa rama en Settings → Domains → Git Branch. La URL automática es suficiente.
-8. Despliega de nuevo los entornos afectados después de configurar variables. Habilita Fluid Compute si el proyecto aún usa los límites antiguos: la ruta reserva hasta 180 segundos para la actualización inicial y la respuesta del proveedor.
+| Variable | Production | Preview / Development |
+|---|---|---|
+| `SUPABASE_URL` | URL del proyecto Ensamblia | La misma URL para leer el catálogo público |
+| `SUPABASE_PUBLISHABLE_KEY` | Lectura del catálogo | Lectura del catálogo, sin permisos de escritura |
+| `SUPABASE_SECRET_KEY` | Publicación desde el servidor | No configurar |
+| `CATALOG_SYNC_SECRET` | Secret compartido con Vault | No configurar |
+| `OPENROUTER_API_KEY` | No configurar | Solo Preview, rama `preview` |
+| `ENSAMBLIA_QUOTE_MODE` | `demo` o ausente | `ai` solo en rama `preview` |
+| `OPENROUTER_MODEL` | Opcional | `nvidia/nemotron-3.5-lightning:free` o un modelo `:free` |
 
-Las ramas de PR usan demo, incluso si tienen variables generales de Preview. Para actualizar el entorno estable tras integrar un PR, avanza `preview` hasta `main` sin force push. Mantén ambas ramas con el mismo código; el comportamiento depende del entorno. Evita promover un artefacto de Preview con sus variables de IA como sustituto de la compilación de Production.
+Se aceptan `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` como compatibilidad, con preferencia por las claves nuevas. Ninguna clave de escritura lleva `NEXT_PUBLIC_`. Las variables adicionales de la integración no son necesarias para el código. Las variables de lectura pueden estar en ramas de PR: sus permisos en Postgres son de lectura y solo para la versión activa.
 
-## Decisión: primera cotización del día
+`main` es Production. `preview` contiene el mismo código y habilita IA únicamente por su entorno. Los PR y otras ramas usan demo. Mantén Vercel Authentication en Preview y confirma la protección sin sesión antes de probar IA. No promociones un artefacto de Preview como sustituto del build de producción.
 
-La actualización se inicia al cotizar, sin cron ni botón manual. Evita descargar productos en días sin visitas y no necesita que el navegador conserve datos. Una actualización comprende varias peticiones a SoloTodo para páginas, categorías, tiendas y ofertas: el límite es **un proceso de actualización al día**, compartido por todos los usuarios.
+## Migraciones y primera publicación
 
-La fecha se calcula en `America/Santiago`, incluyendo horario de verano. Antes de descargar se crea una marca diaria con `SET NX EX` en Redis. Solo una instancia puede obtenerla. Las demás esperan la publicación de la copia, hasta 48 segundos. Se guarda un JSON comprimido con gzip/base64; el catálogo de referencia comprimido ocupa aproximadamente 200 KB con esa codificación, y las ofertas añaden espacio. El límite de escritura es 900 KB. Si se supera, se conserva el respaldo y debe revisarse el tamaño antes de ampliar el límite según el plan del proveedor.
+1. Verifica que el proyecto es **Ensamblia**; no Motora. Aplica las migraciones versionadas, en orden, usando el flujo autenticado de Supabase. No contienen claves reales.
+2. La primera migración crea empresas, productos, ofertas, versiones, estado y registros de sincronización. Todas las tablas tienen RLS. `anon`/`authenticated` solo leen el catálogo activo. No pueden escribir, publicar, leer registros ni adquirir marcas de sincronización.
+3. La segunda habilita `pg_cron` y `pg_net`, crea una clave aleatoria en Vault y el job `ensamblia-daily-catalog` **inactivo**. Copia ese secreto a `CATALOG_SYNC_SECRET` de Vercel mediante un canal autenticado, sin mostrarlo en logs ni commits.
+4. El arranque inicial puede descargar una vez usando `node scripts/prepare-catalog-bootstrap.mjs <ruta-fuera-del-repo.json>`. Conserva la salida para validar cobertura, sin repetir consultas por cada prueba. Publica mediante `publish_catalog` con un registro de bootstrap separado del intento programado del día. Nunca publiques una descarga incompleta.
+5. Despliega y verifica `/`, `/cotizador`, `/api/catalog` y `/api/quote`. Solo después activa el job con `select cron.alter_job(jobid, active:=true) from cron.job where jobname='ensamblia-daily-catalog';`.
+6. Prueba una ejecución real de `select public.request_catalog_sync();` y revisa su respuesta en `net._http_response` y el registro de `catalog_sync_runs`. No publiques cuerpos que incluyan credenciales. Esta ejecución sí consulta SoloTodo; los intentos posteriores del mismo día se rechazan antes de contactar la fuente.
 
-La publicación del catálogo y el cierre de la marca se realizan mediante Lua de forma atómica. La marca dura 48 horas y la última copia no tiene vencimiento. Esto permite reutilizarla tras un despliegue o arranque en frío. La fecha de publicación impide que una descarga antigua sobrescriba una más reciente.
+No hace falta Supabase Auth, Storage ni un panel de empresas. El acceso al catálogo público se hace desde Next.js por RPC con `apikey`. El secreto de sincronización protege el endpoint HTTP, y solo la clave de servidor puede llamar las funciones de escritura.
 
-Si SoloTodo falla, se conserva la última copia válida y se cierra el intento de ese día. Si la función se interrumpe, su marca sigue impidiendo nuevas descargas ese día. La siguiente fecha permite un intento nuevo. Este comportamiento prioriza el límite diario; puede dejar precios antiguos durante una incidencia. La interfaz muestra la fecha y el uso del respaldo.
+## Sincronización diaria
 
-Si Redis falta o no responde, el servidor usa el JSON incluido en el repositorio y no consulta SoloTodo sin coordinación. La interfaz informa que la actualización está pendiente o no disponible. No se presenta ese respaldo como catálogo del día.
+El job ejecuta a las **09:00 UTC**, equivalente a las 05:00 o 06:00 en Santiago según el horario de verano. Supabase hace un POST a `https://ensamblia.vercel.app/api/catalog/sync` con el secreto leído de Vault; no depende del notebook ni de visitas. La ruta rechaza Preview, claves ausentes o inválidas.
 
-Al cambiar piezas se compara la fecha del catálogo usado por la cotización con la del servidor. Si cambió, se responde 409 y se solicita cotizar nuevamente. El servidor valida IDs, compatibilidad y precios. Las copias firmadas antiguas del navegador ya no se utilizan; la ruta pública de actualización manual se eliminó.
+El adaptador de SoloTodo normaliza los productos y sus ofertas. Se conservan tres empresas por cobertura y hasta **50 productos por categoría / 400 total**. Antes de distribuir por bandas de precio se preservan combinaciones completas por tienda para oficina y gaming. Las empresas se muestran como catálogos de prueba procedentes de SoloTodo, sin declarar alianzas comerciales. Un adaptador futuro debe producir el mismo `Snapshot`, normalizar IDs y ofertas, y respetar estos límites.
 
-## Verificación después de publicar
+`claim_catalog_sync` reserva la fecha de `America/Santiago` mediante una clave primaria en Postgres. Solo un proceso puede descargar. Un intento fallido también consume la marca del día para evitar ráfagas contra la fuente. Una interrupción deja el intento `running`; no se reintenta automáticamente ese día. La publicación rechaza marcas de más de diez minutos y versiones anteriores.
 
-- Production: cotiza para dos usos, comprueba `mode: demo` en `/api/quote` y ausencia del botón de actualizar. No debe existir una clave de OpenRouter en las variables de Production.
-- Catálogo: la primera cotización debe devolver `catalog.status: current`; la segunda, desde otro navegador, debe conservar `catalog.updatedAt`. En Redis deben existir `ensamblia:catalog:v1:snapshot`, `:updatedAt` y `:attempt:AAAA-MM-DD`. Revisa que la marca esté en `done`. No borres la marca para repetir pruebas en el mismo día.
-- Preview: abre la URL desde una sesión sin autenticar y comprueba que exige acceso de Vercel. Después de autenticar, cotiza una vez y comprueba `mode: ai` y `quote.generationMode: ai`. Esta prueba sí consume cuota. Un cambio de pieza posterior no debe consumir otra llamada de IA.
-- Otras ramas: deben mostrar la demo. No uses la rama `preview` para ejecutar código de un PR externo sin revisar.
+`publish_catalog` inserta la versión, productos y ofertas, cambia la versión activa y cierra el registro en una sola transacción. Cualquier error revierte todo. Se conserva la versión anterior y 30 días de registros. Si una sincronización falla, los lectores siguen usando la última publicación. Si Supabase está inaccesible, la aplicación muestra el JSON histórico como respaldo, sin presentar ofertas como verificadas. El estado considera vigente la publicación esperada según el horario de las 09:00 UTC, no la medianoche.
 
-`npm test` verifica la concurrencia con un almacenamiento simulado y OpenRouter simulado. CI también ejecuta `node scripts/check-redis-integration.mjs` contra Redis 7 en un contenedor desechable, para comprobar el Lua real, exclusión simultánea, TTL y orden de publicación. CI no dispone de claves ni consulta proveedores externos. La prueba posterior al despliegue confirma los permisos, la conexión REST y la persistencia del servicio conectado.
+Al cotizar se consulta únicamente `get_catalog_snapshot`. La selección de empresas filtra ofertas, descarta productos sin oferta en esas empresas y recalcula su precio mínimo antes de preparar candidatos. Los cambios de piezas repiten la misma validación y rechazan con 409 una versión de catálogo antigua. Los precios y el presupuesto se calculan en el servidor. La agrupación minimiza tiendas para las piezas elegidas dentro del presupuesto; no asegura el mínimo global entre todos los armados posibles ni estima despacho.
 
-## Incidencias y recuperación
+## Verificación y recuperación
 
-`unconfigured` indica que faltan las variables de Redis. `unavailable` indica un fallo al leer o escribir el almacenamiento. `stale` indica un intento fallido, interrumpido o todavía pendiente. Comprueba variables, permisos, límites del proveedor y conectividad sin copiar secretos a logs o issues.
+- `npm run lint`, `npm test`, `npm run build`: sin secretos ni llamadas reales a OpenRouter en CI.
+- Production: respuesta `mode: demo`, ofertas de empresas elegidas y presupuesto respetado. Dos cotizaciones deben conservar `catalog.updatedAt` y no crear sincronizaciones.
+- Preview: protección activa, `mode: ai` solo en rama `preview`; una generación real consume cuota. Cambiar piezas no consume otra llamada.
+- Supabase: comprobar ocho categorías con máximo 50, tres empresas activas, ofertas válidas, RLS y permisos de funciones. Los advisors no deben indicar exposición de funciones privilegiadas.
+- Cron: job activo, `0 9 * * *`, respuesta HTTP exitosa y registro `done`; un segundo disparo no descarga otra vez.
 
-Para recuperar un cambio de código, revierte su commit mediante PR y verifica el despliegue. Si restauras una versión anterior de Vercel, revisa también su comportamiento de IA y catálogo: versiones anteriores usaban actualización manual. Conserva las variables de Redis y la copia persistida durante la recuperación. Cambiar credenciales requiere actualizar las variables y desplegar de nuevo.
+Las credenciales y la copia de Redis se conservan durante la verificación de la migración como respaldo operativo. El nuevo código no las lee. Tras validar Supabase se puede desconectar la integración antigua; no se debe borrar una base compartida con otro proyecto.
 
-## Referencias
-
-- [Entornos de Vercel](https://vercel.com/docs/deployments/environments)
-- [Variables por entorno](https://vercel.com/docs/environment-variables)
-- [Protección de despliegues](https://vercel.com/docs/deployment-protection)
-- [Duración de funciones](https://vercel.com/docs/functions/configuring-functions/duration)
-- [Redis REST API de Upstash](https://upstash.com/docs/redis/features/restapi)
+Para revertir código, abre un PR de reversión. Las migraciones son aditivas y la copia Redis anterior permanece intacta; no elimines tablas ni versiones para revertir una interfaz. Si el cron falla, consulta el registro y `net._http_response`, corrige el origen y conserva la última publicación. Una recuperación excepcional requiere revisar el intento del día antes de autorizar una nueva descarga.

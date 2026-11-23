@@ -8,6 +8,7 @@ import { attachStoreOffers } from "@/lib/store-offers";
 import { QuoteError } from "@/lib/quote-selection";
 import { rebuildSelection, withAlternatives } from "@/lib/component-alternatives";
 import { createDemoQuote } from "@/lib/demo-quote";
+import { catalogCompanies, scopeCatalog } from "@/lib/companies";
 
 export const maxDuration = 180;
 export async function POST(req: NextRequest) {
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
       Object.entries(options).some(([key,values])=>!values.includes(filters[key as keyof BuilderFilters] as string)) ||
       typeof filters.wifiRequired!=="boolean" ||
       (filters.consolidateStores!==undefined && typeof filters.consolidateStores!=="boolean") ||
+      (filters.companyIds!==undefined && (!Array.isArray(filters.companyIds)||filters.companyIds.length>10||filters.companyIds.some(id=>typeof id!=="string"||id.length>200))) ||
       (filters.customInstructions!==undefined && (typeof filters.customInstructions!=="string"||filters.customInstructions.length>1000))) {
     return NextResponse.json({error:"Revisa el presupuesto y las preferencias de la cotización."},{status:400});
   }
@@ -33,8 +35,11 @@ export async function POST(req: NextRequest) {
     if (mode === "ai" && !process.env.OPENROUTER_API_KEY?.trim()) {
       return NextResponse.json({error:"Configura OPENROUTER_API_KEY en Preview para probar IA."},{status:503});
     }
-    const { snapshot, status } = await getDailyCatalog();
+    const stored = await getDailyCatalog();
+    const { status } = stored;
+    const snapshot = scopeCatalog(stored.snapshot, filters.companyIds);
     const catalog = { updatedAt: snapshot.updatedAt, count: snapshot.products.length, status,
+      companies: catalogCompanies(stored.snapshot),
       profiles: Object.fromEntries(Object.entries(createProfileIndex(snapshot.products)).map(([useCase,ids])=>[useCase,ids.length])),
     };
     if (body.selection !== undefined) {
@@ -48,7 +53,7 @@ export async function POST(req: NextRequest) {
     const quote=attachStoreOffers(generated,filters.consolidateStores ?? false,snapshot.offers);
     return NextResponse.json({mode,catalog,quote:{...withAlternatives(quote,filters,snapshot.products,snapshot.offers),generationMode:mode}});
   } catch (error) {
-    console.error("Cotización:",error);
+    console.error("Cotización:",error instanceof QuoteError?error.status:"internal_error");
     return NextResponse.json({error:error instanceof QuoteError?error.message:"Ocurrió un error al preparar la cotización."},
       {status:error instanceof QuoteError?error.status:500});
   }

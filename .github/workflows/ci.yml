@@ -19,16 +19,6 @@ jobs:
     name: Lint and regression tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379/tcp
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,9 +28,6 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - run: node scripts/check-redis-integration.mjs
-        env:
-          CI_REDIS_PORT: ${{ job.services.redis.ports[6379] }}
   build:
     name: Build and type check
     runs-on: ubuntu-latest
