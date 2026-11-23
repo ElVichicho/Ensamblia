@@ -21,3 +21,5 @@
 @media(max-width:1100px){.site.pulso-home .pulso-copy h1{font-size:54px;letter-spacing:-2.3px}}
 @media(max-width:800px){.site.pulso-home .pulso-copy h1{font-size:47px;letter-spacing:-2px}}
 @media(max-width:600px){.site.pulso-home .pulso-copy h1{font-size:54px;letter-spacing:-2.5px}}
+.company-placeholders{display:flex;align-items:center;justify-content:space-around;gap:22px;min-height:70px}.company-placeholders>span{width:130px;height:35px;background:var(--soft);border-radius:5px}
+@media(max-width:600px){.company-placeholders{flex-direction:column;align-items:stretch;gap:12px;min-height:195px}.company-placeholders>span{height:48px;width:100%}}

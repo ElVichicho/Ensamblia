@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- El inicio muestra Pulso desde la primera respuesta; solo las tiendas esperan al catálogo, sin pantalla completa de carga.
+
 - Publicación compatible con `safeupdate`, diagnóstico sin secretos y vigencia de recuperaciones anteriores al horario diario.
 
 - Inicio Pulso con empresas del catálogo y cotizador independiente en `/cotizador`, conservando preferencias, tabla de piezas, alternativas y ambos temas.
