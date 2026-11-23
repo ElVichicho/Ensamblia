@@ -10,12 +10,13 @@
 ![Tailwind CSS 4](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 ![OpenRouter API](https://img.shields.io/badge/OpenRouter-API-A72D34?style=for-the-badge&logo=openrouter&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 
 Cotizador de computadores con IA que ayuda a elegir componentes según el uso, el presupuesto y las preferencias de compra.
 
 Ensamblia parte de un problema cotidiano al comprar un PC. Elegir cada pieza requiere comparar especificaciones, comprobar compatibilidad y coordinar ofertas de distintas tiendas. La aplicación propone un armado completo, explica la elección y permite explorar alternativas por componente antes de decidir.
 
-El producto está orientado a evolucionar como un **SaaS para tiendas de tecnología**, conectado al catálogo de cada empresa. La demo actual utiliza la API pública de SoloTodo para trabajar con productos y ofertas de comercios chilenos.
+Ensamblia es una **plataforma de cotización entre empresas** en un mismo dominio. El inicio presenta las tiendas disponibles y conduce a un cotizador independiente, donde puedes elegir una o varias empresas. SoloTodo es la fuente inicial para probar catálogos de comercios chilenos; su presencia no implica una alianza comercial. La incorporación de empresas se gestiona directamente, sin un portal empresarial.
 
 **[Probar la demo](https://ensamblia.vercel.app)**
 
@@ -29,12 +30,13 @@ El producto está orientado a evolucionar como un **SaaS para tiendas de tecnolo
 - **Hasta tres opciones por categoría.** La pieza seleccionada y hasta dos alternativas que respetan el presupuesto y las comprobaciones disponibles del resto del equipo.
 - **Comparaciones con datos del catálogo.** Diferencias de puntuación PassMark para CPU y 3DMark Time Spy para GPU cuando ambos productos tienen datos. En otras categorías se comparan características como capacidad, velocidad de lectura, potencia o conectividad.
 - **Ofertas y tiendas.** Precio y enlace por pieza, con la opción de priorizar el menor precio o una compra en menos tiendas dentro del presupuesto.
-- **Catálogo diario compartido.** La primera cotización del día actualiza productos y ofertas; el resto reutiliza la copia del servidor. La fecha se calcula en America/Santiago.
+- **Empresas a tu elección.** Las tiendas elegidas determinan los productos, precios y alternativas disponibles. Puedes entrar al cotizador desde una empresa del inicio.
+- **Catálogo diario en Supabase.** Una tarea programada actualiza productos y ofertas a las 09:00 UTC (05:00–06:00 en Chile). Cotizar solo lee la versión guardada y no descarga datos de SoloTodo.
 - **Interfaz adaptable.** Tema claro y oscuro, vista móvil y copia de la cotización.
 
 ## Cómo funciona
 
-1. **Obtención de datos.** Al cotizar, el servidor consulta la caché persistente en Redis. La primera solicitud del día adquiere una marca exclusiva y descarga productos y ofertas de SoloTodo. El catálogo de referencia permite iniciar la aplicación si falta la caché.
+1. **Obtención de datos.** Supabase Cron invoca una ruta protegida de producción una vez al día. El servidor descarga productos y ofertas, conserva tres tiendas piloto por cobertura y publica una versión completa en Postgres. La exclusión diaria evita descargas simultáneas y una transacción conserva el catálogo anterior ante fallos. Las cotizaciones solo leen la versión publicada.
 2. **Selección por contexto.** Las reglas clasifican los productos por uso y filtran según presupuesto y preferencias. Un producto puede pertenecer a varios perfiles.
 3. **Preparación del armado.** El servidor genera hasta ocho configuraciones con las comprobaciones técnicas disponibles.
 4. **Selección según entorno.** Production elige una configuración con reglas y respuestas por uso. La rama Preview estable puede utilizar OpenRouter con configuración de servidor.
@@ -44,7 +46,7 @@ La integración de Preview utiliza `src/lib/openrouter.ts`. Production fuerza el
 
 ## Datos y comparaciones
 
-El catálogo de referencia incluido contiene **1.511 productos en ocho categorías**, con un máximo de **200 por categoría**. La cantidad disponible puede variar al actualizar las ofertas.
+El catálogo sincronizado conserva **hasta 50 productos por categoría: 400 entre ocho categorías**, con sus ofertas en las tiendas piloto. Se preservan combinaciones compatibles y se completa la selección con variedad de precios. La cantidad de ofertas es distinta del número de productos. El JSON histórico de respaldo incluido contiene 1.511 productos y solo se usa con una advertencia si Supabase no está disponible; no presenta ofertas como verificadas.
 
 La selección por contexto reduce los productos utilizados para preparar los armados. Por ejemplo, las reglas de oficina excluyen productos de alto consumo o de estaciones de trabajo cuando sus características quedan fuera del perfil. Después se aplican las preferencias y el presupuesto para preparar las configuraciones.
 
@@ -65,7 +67,7 @@ Las comprobaciones abarcan socket, tipo y cantidad de RAM, dimensiones conocidas
 | Interfaz | Next.js 16, React 19, TypeScript, Tailwind CSS 4 y Lucide |
 | Servidor | Route Handlers de Next.js y reglas de selección y compatibilidad |
 | IA | Integración con OpenRouter y NVIDIA Nemotron 3.5 Lightning. La demo pública utiliza reglas |
-| Datos | API pública de SoloTodo, catálogo JSON de respaldo y caché diaria comprimida en Redis |
+| Datos | Supabase Postgres, RLS, versiones transaccionales, Cron y API pública de SoloTodo |
 | Despliegue | Vercel conectado al repositorio de GitHub |
 
 ## Ejecutar en local
@@ -81,7 +83,7 @@ npm run dev
 
 Abre [localhost:3000](http://localhost:3000). El catálogo de referencia permite probar el cotizador y sus alternativas.
 
-Sin variables, local usa la demo y el catálogo de referencia. Para probar la actualización diaria, copia [.env.example](.env.example) a `.env.local` y configura Redis. Para probar IA en desarrollo, agrega `ENSAMBLIA_QUOTE_MODE=ai` y una clave de OpenRouter de servidor.
+Sin variables, local usa la demo y el catálogo de referencia. Copia [.env.example](.env.example) a `.env.local` y configura `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` para leer el catálogo publicado. No necesitas la clave secreta para desarrollar la interfaz. Para probar IA en desarrollo, agrega `ENSAMBLIA_QUOTE_MODE=ai` y una clave de OpenRouter de servidor.
 
 ## Production y Preview
 
@@ -91,7 +93,7 @@ Sin variables, local usa la demo y el catálogo de referencia. Para probar la ac
 | Preview estable | preview | IA si ENSAMBLIA_QUOTE_MODE=ai | Clave restringida a esa rama |
 | PRs y otras ramas | Cualquier otra | Demo | Sin acceso a IA desde el cotizador |
 
-Consulta [la configuración de Vercel y la operación del catálogo](docs/deployment.md) para conectar Redis, proteger Preview, asignar su URL y verificar el despliegue. Los cambios de variables requieren un despliegue nuevo.
+Consulta [la configuración de Vercel y Supabase](docs/deployment.md) para aplicar migraciones, proteger Preview y verificar el cron. Los cambios de variables requieren un despliegue nuevo.
 
 ## Comprobaciones y comandos
 
@@ -103,11 +105,11 @@ npx tsc --noEmit
 node scripts/check-quote-selection.mjs
 node scripts/check-component-alternatives.mjs
 node scripts/check-demo-mode.mjs
-node scripts/check-daily-catalog.mjs
+node scripts/check-catalog-storage.mjs
 npm run build
 ```
 
-Las comprobaciones cubren presupuestos, selección de candidatos, cantidades de RAM, compatibilidad de los cambios, cálculo de porcentajes, datos faltantes, agrupación de tiendas y filtrado por uso. OpenRouter se prueba con respuestas simuladas. Las pruebas de entorno comprueban el aislamiento de Production y la integración de Preview. Las de caché cubren instancias simultáneas, cambio de día en Chile, fallos y conservación de datos.
+Las comprobaciones cubren presupuestos, candidatos, RAM, compatibilidad, benchmarks, agrupación y filtrado por empresa, precios de las tiendas elegidas, límites del catálogo, exclusión de sincronizaciones y fallos. OpenRouter se prueba con respuestas simuladas. Las pruebas de entorno comprueban el aislamiento de Production y Preview. Las migraciones y sus permisos se verifican también contra Supabase.
 
 Para actualizar el catálogo de referencia del repositorio:
 
@@ -122,14 +124,18 @@ Este comando consulta productos y ofertas de SoloTodo y reemplaza el archivo de 
 ```text
 src/
 ├── app/
+│   ├── api/catalog/sync/route.ts # Sincronización protegida, solo Production
 │   ├── api/quote/route.ts        # Cotización y cambios de componentes
+│   ├── cotizador/page.tsx       # Cotizador separado del inicio
 │   ├── builder.tsx              # Interfaz interactiva
-│   └── page.tsx                 # Modo elegido en el servidor
+│   └── page.tsx                 # Inicio Pulso y empresas del catálogo
 ├── data/solotodo-catalog.json    # Catálogo de referencia
 ├── lib/
 │   ├── catalog-profiles.ts      # Clasificación y filtrado por uso
 │   ├── catalog-snapshot.ts      # Descarga de productos y ofertas
-│   ├── daily-catalog.ts         # Caché compartida y marca diaria
+│   ├── daily-catalog.ts         # Lectura y coordinación de sincronización
+│   ├── supabase-catalog.ts      # Acceso REST de servidor a Postgres
+│   ├── companies.ts             # Empresas, precios y catálogo acotado
 │   ├── deployment-mode.ts       # Aislamiento de entornos
 │   ├── component-alternatives.ts
 │   ├── openrouter.ts
@@ -142,7 +148,7 @@ src/
 
 - Acceso autenticado a la generación con IA y control de cuota por empresa.
 - Conectores para APIs de tiendas y sus propios inventarios.
-- Espacios de trabajo por empresa, con autenticación y configuración de su catálogo.
+- Incorporación de empresas mediante contacto directo y adaptación de sus APIs, conservando un solo dominio.
 - Métricas para evaluar el tiempo de cotización, las selecciones válidas y la continuación hacia la compra.
 
 ## Autor y origen
