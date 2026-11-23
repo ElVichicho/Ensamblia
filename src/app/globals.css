@@ -300,6 +300,8 @@ input[type=checkbox] { accent-color: var(--accent); }
 .alternative-card p { font-size: 11px; color: var(--muted); line-height: 1.7; margin: 4px 0 10px; }
 .alternative-price { display: block; margin: 10px 0 4px; font-size: 19px; }
 .alternative-price small { font-size: 11px; font-weight: 400; }
+.alternative-store a { display: inline-flex; align-items: center; gap: 5px; color: var(--link); overflow-wrap: anywhere; }
+.alternative-store svg { flex-shrink: 0; }
 .alternative-metric { display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--line); padding: 14px 0; margin-top: auto; min-height: 108px; }
 .alternative-metric strong { font-size: 24px; font-weight: 600; color: var(--accent); }
 .alternative-metric span { font-size: 11px; line-height: 1.6; }
