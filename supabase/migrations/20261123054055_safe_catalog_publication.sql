@@ -30,4 +30,3 @@ begin
  return true;
 end;
 $$;
-
