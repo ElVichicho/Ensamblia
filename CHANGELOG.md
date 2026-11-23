@@ -2,6 +2,9 @@
 
 ## Sin publicar
 
+- Reparación local de JSON mal formado de la IA, seguida de validación estricta de la opción; mensajes de error comprensibles y reintentos acotados.
+- El catálogo enlaza únicamente las ofertas de tiendas. El nombre abre la oferta más económica de las tiendas seleccionadas; sin ofertas no aparece enlace externo.
+
 - Catálogo de componentes en `/catalogo`, con búsqueda, categorías, tiendas, comparación de ofertas y paginación; usa exclusivamente los datos guardados.
 - Franja de tiendas continua con pausa y movimiento reducido, e ilustración del PC con geometría corregida.
 - Inicio sin pantalla de carga global; cotizador y catálogo muestran su estructura mientras esperan los datos.

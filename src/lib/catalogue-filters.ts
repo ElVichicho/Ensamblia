@@ -1,7 +1,7 @@
 import type { ComponentCategory } from "@/types/pc-builder";
 export const categoryLabels:Record<ComponentCategory,string>={cpu:"Procesadores",motherboard:"Placas madre",ram:"Memorias RAM",gpu:"Tarjetas de video",storage:"Almacenamiento",psu:"Fuentes de poder",case:"Gabinetes",cooler:"Refrigeración"};
 export type CatalogueOffer={companyId:string;companyName:string;priceCLP:number;url:string};
-export type CatalogueProduct={id:number;name:string;brand:string|null;category:ComponentCategory;categoryLabel:string;imageUrl?:string;referenceUrl:string;referencePrice:number;features:string[];offers:CatalogueOffer[]};
+export type CatalogueProduct={id:number;name:string;brand:string|null;category:ComponentCategory;categoryLabel:string;imageUrl?:string;referencePrice:number;features:string[];offers:CatalogueOffer[]};
 export type CatalogueFilters={query:string;category:string;companyIds:string[];sort:"price-asc"|"price-desc"|"name"};
 export type CatalogueResult=CatalogueProduct&{visibleOffers:CatalogueOffer[];displayPrice:number};
 const normalize=(s:string)=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
