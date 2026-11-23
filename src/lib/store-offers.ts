@@ -1,6 +1,6 @@
 import type { BuildQuote } from "@/types/pc-builder";
 
-export type Offer = { store: string; storeUrl: string; priceCLP: number };
+export type Offer = { storeId?: string; store: string; storeUrl: string; priceCLP: number };
 type Plan = { cost: number; offers: (Offer | undefined)[] };
 type Entity = {
   currency_id: number; condition: string; is_visible: boolean; store_id: number;
@@ -71,7 +71,7 @@ export async function fetchStoreOffers(ids: string[], signal: AbortSignal) {
               entity.condition !== "https://schema.org/NewCondition" || !Number.isSafeInteger(price) || price <= 0 ||
               !/^https?:\/\//i.test(entity.external_url)) continue;
           const store = entity.seller ? `${name} · ${entity.seller}` : name;
-          if (price < (byStore.get(store)?.priceCLP ?? Infinity)) byStore.set(store,{store,storeUrl:entity.external_url,priceCLP:price});
+          if (price < (byStore.get(store)?.priceCLP ?? Infinity)) byStore.set(store,{storeId:`solotodo-${entity.store_id}${entity.seller?`-${Buffer.from(entity.seller).toString('base64url')}`:''}`,store,storeUrl:entity.external_url,priceCLP:price});
         }
         offers[id] = [...byStore.values()];
       }

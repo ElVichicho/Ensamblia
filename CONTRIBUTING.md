@@ -23,4 +23,4 @@ Integra con **Squash and merge** para conservar un commit por cambio. Después d
 
 La protección de `main` debe exigir PR y ambos checks de CI, e impedir force pushes y borrado. Una aprobación externa solo es necesaria cuando haya otra persona disponible para revisar. No incluyas credenciales de proveedores en GitHub Actions: la compilación y las pruebas deben funcionar sin ellas.
 
-Este flujo adapta las prácticas utilizadas en Motora al catálogo y los entornos de Ensamblia. Los controles específicos de talleres y Supabase pertenecen a aquel proyecto.
+Este flujo adapta las prácticas utilizadas en Motora al catálogo y los entornos de Ensamblia. Las migraciones de Supabase se guardan en `supabase/migrations`; registra sus pruebas y el orden de activación del cron en el PR. Nunca uses la base de Motora para probar cambios de Ensamblia.

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowDownToLine, ArrowUpRight, Cpu, Layers3, Check, ChevronRight, CircleAlert, LoaderCircle, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { useState } from "react";
+import { ArrowDownToLine, ArrowUpRight, Cpu, Check, ChevronRight, CircleAlert, LoaderCircle, SlidersHorizontal } from "lucide-react";
+import SiteHeader from "./site-header";
+import type { Company } from "@/lib/companies";
 import type { BuildQuote, BuilderFilters, ComponentCategory } from "@/types/pc-builder";
 
 import type { QuoteMode } from "@/lib/deployment-mode";
@@ -16,11 +18,11 @@ const initial:BuilderFilters={
   coolingPreference:"air",caseSize:"standard",customInstructions:"",consolidateStores:false,
 };
 
-type CatalogInfo = { updatedAt: string; count: number; profiles: Record<string, number>; status: CatalogStatus };
+type CatalogInfo = { updatedAt: string; count: number; profiles?: Record<string, number>; status: CatalogStatus };
 
-export default function Builder({mode}:{mode:QuoteMode}){
-  const [catalog,setCatalog]=useState<CatalogInfo|null>(null);
-  const [filters,setFilters]=useState(initial);
+export default function Builder({mode,companies,initialCompany,initialCatalog}:{mode:QuoteMode;companies:Company[];initialCompany?:string;initialCatalog:CatalogInfo}){
+  const [catalog,setCatalog]=useState<CatalogInfo|null>(initialCatalog);
+  const [filters,setFilters]=useState<BuilderFilters>({...initial,...(initialCompany?{companyIds:[initialCompany]}:{})});
   const [quote,setQuote]=useState<BuildQuote|null>(null);
   const [submitted,setSubmitted]=useState<BuilderFilters|null>(null);
   const [loading,setLoading]=useState(false);
@@ -29,19 +31,6 @@ export default function Builder({mode}:{mode:QuoteMode}){
   const [changing,setChanging]=useState(false);
   const [comparisonCategory,setComparisonCategory]=useState<ComponentCategory>("cpu");
   const busy=loading||changing;
-  useEffect(()=>{
-    try {
-      const theme=localStorage.getItem("solotodo-theme");
-      if(theme==="light"||theme==="dark") document.documentElement.dataset.theme=theme;
-    } catch {}
-  },[]);
-  function toggleTheme(){
-    const root=document.documentElement;
-    const dark=root.dataset.theme?root.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme=dark?"light":"dark";
-    root.dataset.theme=theme;
-    try {localStorage.setItem("solotodo-theme",theme);} catch {}
-  }
   function update<K extends keyof BuilderFilters>(key:K,value:BuilderFilters[K]){
     setFilters(current=>({...current,[key]:value}));
   }
@@ -89,33 +78,20 @@ export default function Builder({mode}:{mode:QuoteMode}){
   const comparisonOptions=quote?.alternatives?.[comparisonCategory] ?? [];
   return (
     <div className="site">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <a href="#cotizador" className="wordmark"><Layers3 size={26}/><span>ensamblia</span></a>
-          <span className="header-divider"/>
-          <span className="header-title">Cotizador para tu tienda</span>
-          <div className="header-actions">
-            <a href="https://www.solotodo.cl/" target="_blank" rel="noreferrer" className="catalog-link">Catálogo <ArrowUpRight size={14}/></a>
-            <button type="button" className="theme-toggle" onClick={toggleTheme}>
-              <span className="theme-to-dark"><Moon size={17}/><span className="sr-only">Activar tema oscuro</span></span>
-              <span className="theme-to-light"><Sun size={17}/><span className="sr-only">Activar tema claro</span></span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader builder/>
       <div className="subnav"><div><span>Ensamblia</span> <ChevronRight size={12}/> Cotizador <span className="demo-source">Demo con catálogo SoloTodo</span></div></div>
       <main className="workspace" id="cotizador">
         <p className="catalog-status" role="status">
           {catalog ? `${catalog.status==="current"?"Catálogo del día":"Catálogo de respaldo"}: ${catalog.count} productos · ${new Date(catalog.updatedAt).toLocaleString("es-CL",{timeZone:"America/Santiago"})}`
-            : "El catálogo se comprueba automáticamente al cotizar y se comparte durante el día."}
+            : "El catálogo se actualiza diariamente y se comparte entre todas las cotizaciones."}
         </p>
         {catalog&&catalog.status!=="current"&&<p className="catalog-status">{catalog.status==="unconfigured"?"La actualización automática está pendiente de configuración. Se muestran precios de referencia.":"No se pudo obtener el catálogo del día. Se conserva la última copia disponible; confirma precios y stock en la tienda."}</p>}
         {catalog?.profiles&&<details className="catalog-coverage"><summary>Productos disponibles por uso</summary>
-          <p>Hasta 200 productos por categoría. Un producto puede servir para varios usos.</p>
+          <p>Hasta 50 productos por categoría en el catálogo actualizado. Un producto puede servir para varios usos.</p>
           <dl>{uses.map(([id,label])=><div key={id}><dt>{label}</dt><dd>{catalog.profiles?.[id] ?? 0}</dd></div>)}</dl>
         </details>}
         <div className="page-heading">
-          <div><p className="eyebrow">COTIZADOR DE PC</p>
+          <div><p className="eyebrow">Cotizador de PC</p>
             <h1>Tu próximo PC, <span>pieza por pieza.</span></h1>
             <p>Cuéntanos qué necesitas. Encuentra un armado para tu uso y presupuesto.</p>
           </div>
@@ -132,6 +108,7 @@ export default function Builder({mode}:{mode:QuoteMode}){
                 <label className="field-label budget-label" htmlFor="budget">Presupuesto máximo <span>CLP</span></label>
                 <input id="budget" type="number" min={350000} max={3000000} step={25000} value={filters.budgetCLP} onChange={e=>update("budgetCLP",Number(e.target.value))} required/>
                 <div className="budget-presets">{[500000,1000000,1400000,2200000].map(n=><button className={filters.budgetCLP===n?"selected":""} type="button" key={n} onClick={()=>update("budgetCLP",n)}>{n===2200000?"2,2 M":n===1400000?"1,4 M":n===1000000?"1 M":"500 mil"}</button>)}</div>
+                <fieldset className="company-options"><legend>Empresas para cotizar</legend>{companies.length?<><label className="checkbox-label"><input type="checkbox" checked={filters.companyIds===undefined} onChange={e=>update("companyIds",e.target.checked?undefined:[])}/>Todas las empresas</label>{companies.map(company=><label className="checkbox-label company-option" key={company.id}><input type="checkbox" checked={filters.companyIds===undefined||filters.companyIds.includes(company.id)} onChange={e=>{const ids=filters.companyIds??companies.map(c=>c.id);update("companyIds",e.target.checked?[...ids,company.id]:ids.filter(id=>id!==company.id));}}/><span>{company.name}<small>{company.products} productos · {company.categories.length} categorías</small></span></label>)}</>:<p className="form-footnote">Sin ofertas verificadas disponibles. Se usarán precios de referencia del catálogo incluido.</p>}</fieldset>
                 <label className="field-label" htmlFor="store-preference">Preferencia de compra</label>
                 <select id="store-preference" value={filters.consolidateStores?"few":"cheap"} onChange={e=>update("consolidateStores",e.target.value==="few")}>
                   <option value="cheap">Menor precio por pieza</option>
@@ -158,7 +135,7 @@ export default function Builder({mode}:{mode:QuoteMode}){
                 </details>
                 {mode==="ai"&&<><label className="field-label" htmlFor="instructions">Necesidades adicionales</label><textarea id="instructions" maxLength={1000} value={filters.customInstructions} onChange={e=>update("customInstructions",e.target.value)}/></>}
                 <button className="primary-button" type="submit">{loading?<><LoaderCircle className="spinner" size={16}/>Preparando cotización…</>:"Cotizar equipo"}</button>
-                <p className="form-footnote">{mode==="ai"?"Selección con IA. ":"Demo con reglas del catálogo. "}La primera cotización del día puede tardar mientras se actualizan las ofertas. Revisa las observaciones antes de comprar.</p>
+                <p className="form-footnote">{mode==="ai"?"Selección con IA. ":"Demo con reglas del catálogo. "}Usamos el catálogo guardado, sin descargar productos al cotizar. Revisa las observaciones antes de comprar.</p>
               </fieldset>
             </form>
           </aside>

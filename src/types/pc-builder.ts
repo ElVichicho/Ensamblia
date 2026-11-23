@@ -80,4 +80,5 @@ export interface BuilderFilters {
   caseSize: 'compact' | 'standard' | 'any';
   customInstructions?: string;
   consolidateStores?: boolean;
+  companyIds?: string[];
 }
