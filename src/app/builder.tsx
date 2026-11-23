@@ -181,6 +181,7 @@ export default function Builder({mode,companies,initialCompany,initialCatalog}:{
                     <h4>{option.component.name}</h4>
                     <p>{option.explanation}</p>
                     <strong className="alternative-price">{money(option.component.priceCLP)}{(option.component.quantity ?? 1)>1&&<small> · {option.component.quantity} unidades</small>}</strong>
+                    <p className="alternative-store">{option.component.storeUrl?<a href={option.component.storeUrl} target="_blank" rel="noreferrer"><span>Disponible en {option.component.store}</span><ArrowUpRight size={13}/><span className="sr-only">Abrir oferta en una nueva pestaña</span></a>:<span>Sin oferta de tienda verificada</span>}</p>
                     <p>Total del equipo {money(option.totalCLP)}</p>
                     <p>{selected?"Precio de referencia para comparar":`${option.priceDifferenceCLP>0?"+":"−"}${money(Math.abs(option.priceDifferenceCLP))} en el total del equipo`}</p>
                     <div className="alternative-metric">{option.benchmark?<>
