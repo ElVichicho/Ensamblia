@@ -30,7 +30,7 @@ Ensamblia es una **plataforma de cotización entre empresas** en un mismo domini
 - **Hasta tres opciones por categoría.** La pieza seleccionada y hasta dos alternativas que respetan el presupuesto y las comprobaciones disponibles del resto del equipo.
 - **Comparaciones con datos del catálogo.** Diferencias de puntuación PassMark para CPU y 3DMark Time Spy para GPU cuando ambos productos tienen datos. En otras categorías se comparan características como capacidad, velocidad de lectura, potencia o conectividad.
 - **Ofertas y tiendas.** Precio y enlace por pieza, con la opción de priorizar el menor precio o una compra en menos tiendas dentro del presupuesto.
-- **Empresas a tu elección.** Las tiendas elegidas determinan los productos, precios y alternativas disponibles. Puedes entrar al cotizador desde una empresa del inicio.
+- **Empresas a tu elección.** Las tiendas elegidas determinan los productos, precios y alternativas disponibles. Puedes explorar el catálogo y comparar las ofertas de las empresas disponibles.
 - **Catálogo diario en Supabase.** Una tarea programada actualiza productos y ofertas a las 09:00 UTC (05:00–06:00 en Chile). Cotizar solo lee la versión guardada y no descarga datos de SoloTodo.
 - **Interfaz adaptable.** Tema claro y oscuro, vista móvil y copia de la cotización.
 
@@ -93,7 +93,7 @@ Sin variables, local usa la demo y el catálogo de referencia. Copia [.env.examp
 | Preview estable | preview | IA si ENSAMBLIA_QUOTE_MODE=ai | Clave restringida a esa rama |
 | PRs y otras ramas | Cualquier otra | Demo | Sin acceso a IA desde el cotizador |
 
-Consulta [la configuración de Vercel y Supabase](docs/deployment.md) para aplicar migraciones, proteger Preview y verificar el cron. Los cambios de variables requieren un despliegue nuevo.
+Consulta [cómo se renuevan el catálogo y las tiendas](docs/catalogue-refresh.md), y [la configuración de Vercel y Supabase](docs/deployment.md) para aplicar migraciones, proteger Preview y verificar el cron. Los cambios de variables requieren un despliegue nuevo.
 
 ## Comprobaciones y comandos
 

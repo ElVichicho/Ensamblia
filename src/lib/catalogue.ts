@@ -16,7 +16,7 @@ function features(product:Product):string[]{
 }
 export function catalogueProducts(snapshot:Snapshot):CatalogueProduct[]{
  return snapshot.products.map(p=>({id:p.id,name:p.name,brand:p.brand,category:p.category,categoryLabel:categoryLabels[p.category],
-  ...(p.imageUrl?.startsWith("https://media.solotodo.com/")?{imageUrl:p.imageUrl}:{}),referenceUrl:p.solotodoUrl,referencePrice:p.priceCLP,features:features(p),
+  ...(p.imageUrl?.startsWith("https://media.solotodo.com/")?{imageUrl:p.imageUrl}:{}),referencePrice:p.priceCLP,features:features(p),
   offers:(snapshot.offers[String(p.id)]??[]).map(o=>({companyId:companyId(o),companyName:o.store,priceCLP:o.priceCLP,url:o.storeUrl})).sort((a,b)=>a.priceCLP-b.priceCLP)
  }));
 }

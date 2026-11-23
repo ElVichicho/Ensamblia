@@ -1,6 +1,7 @@
 import { BuildQuote, BuilderFilters } from "@/types/pc-builder";
 import { type Product, products, QuoteError, selectCandidates, specifications, prepareConfigurations } from "./quote-selection";
 import { relevantProducts, useCaseLabels } from "./catalog-profiles";
+import { parseAiSelection } from "./ai-selection";
 
 export const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3.5-lightning:free";
 export const OPENROUTER_RATE_LIMIT_MESSAGE =
@@ -34,7 +35,7 @@ Explica solo los datos proporcionados. No prometas FPS, resolución, ausencia de
 Respeta el tipo de memoria de la placa: un cambio entre DDR4 y DDR5 requiere cambiar la placa y la RAM. No afirmes soporte de actualizaciones sin datos del fabricante.
 Responde SOLO JSON:
 {"option":1,"buildName":"nombre breve","summary":"justificación y limitaciones, máximo 40 palabras","upgradePath":"mejora futura breve","reasons":{"cpu":"motivo de CPU","gpu":"motivo de GPU","ram":"motivo de RAM","storage":"motivo de SSD"}}
-option debe ser un número de las configuraciones proporcionadas. No cambies piezas. No inventes mediciones.`;
+option debe ser un número entero de las configuraciones proporcionadas. Usa comillas dobles en todas las claves y textos, sin comas finales ni bloques Markdown. No cambies piezas. No inventes mediciones.`;
   const messages=[{role:"user",content:prompt}];
   const deadline=Date.now()+50000;
   let lastError="La selección no pudo completarse.";
@@ -64,13 +65,8 @@ option debe ser un número de las configuraciones proporcionadas. No cambies pie
     if (typeof content!=="string"||!content.trim()) throw new QuoteError("El proveedor devolvió una respuesta vacía. Intenta nuevamente.",503);
     try {
       if (data.choices[0].finish_reason==="length") throw new QuoteError("La respuesta quedó incompleta.");
-      const match=content.match(/\{[\s\S]*\}/);
-      if (!match) throw new QuoteError("La respuesta no contiene JSON.");
-      const result=JSON.parse(match[0]);
-      const config=configurations.find(c=>c.option===Number(result.option));
-      if (!config||typeof result.buildName!=="string"||typeof result.summary!=="string"||typeof result.upgradePath!=="string") {
-        throw new QuoteError("Selecciona un número option válido y completa buildName, summary y upgradePath.");
-      }
+      const result=parseAiSelection(content,configurations.map(c=>c.option));
+      const config=configurations.find(c=>c.option===result.option)!;
       const quote:BuildQuote={
         ...config.quote,buildName:result.buildName,executiveSummary:result.summary,
         performanceSummary:result.summary,upgradePath:result.upgradePath,
@@ -87,9 +83,9 @@ option debe ser un número de las configuraciones proporcionadas. No cambies pie
       };
       return {quote,modelUsed:data.model||modelName};
     } catch (error) {
-      lastError=error instanceof Error?error.message:"Selección inválida.";
+      lastError=error instanceof QuoteError?error.message:"La respuesta no tiene el formato requerido.";
       messages.push({role:"assistant",content},{role:"user",content:`Corrige el JSON completo. ${lastError}`});
     }
   }
-  throw new QuoteError(`No encontramos una configuración válida. ${lastError}`);
+  throw new QuoteError("La IA no pudo devolver una selección válida. Intenta nuevamente; tus preferencias se mantienen.",502);
 }
