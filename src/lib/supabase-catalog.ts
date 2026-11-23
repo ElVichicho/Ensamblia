@@ -10,7 +10,11 @@ export function catalogRpc(write = false): CatalogRpc | undefined {
       method:"POST",headers:{apikey:key,"Content-Type":"application/json",...(key.startsWith("eyJ")?{Authorization:`Bearer ${key}`}:{})},
       body:JSON.stringify(body),cache:"no-store",signal:AbortSignal.timeout(write?25000:8000),
     });
-    if (!response.ok) throw new Error(`Catalog database request failed (${response.status})`);
-    return await response.json() as T;
+    if (!response.ok) {
+      const body=await response.json().catch(()=>null);
+      const code=typeof body?.code==="string"&&/^[A-Z0-9]{5,12}$/.test(body.code)?body.code:"UNKNOWN";
+      throw new Error(`Catalog database request failed (${response.status}; ${code})`);
+    }
+    return (response.status===204?null:await response.json()) as T;
   };
 }
