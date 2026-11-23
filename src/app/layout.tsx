@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./pulso.css";
 
 export const metadata: Metadata = {
-  title: "Ensamblia | Cotizador de PC para tu tienda",
-  description: "Ensamblia ayuda a elegir componentes de PC según uso, presupuesto y compatibilidad. Demostración del cotizador para tiendas de tecnología.",
+  title: "Ensamblia | Tu próximo PC, todo encaja",
+  description: "Cotiza un PC compatible con tu presupuesto. Compara componentes entre una o varias tiendas con Ensamblia.",
 };
 
 export default function RootLayout({
