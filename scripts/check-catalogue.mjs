@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { loadTypescript } from "./load-typescript.mjs";
+const {catalogueProducts}=loadTypescript("src/lib/catalogue.ts");
 const {filterCatalogue}=loadTypescript("src/lib/catalogue-filters.ts");
-const base={brand:"AMD",category:"cpu",categoryLabel:"Procesadores",features:["AM5"],referenceUrl:"https://example.com/product",referencePrice:90};
+const base={brand:"AMD",category:"cpu",categoryLabel:"Procesadores",features:["AM5"],referencePrice:90};
 const products=[{...base,id:1,name:"Ryzen básico",offers:[{companyId:"a",companyName:"A",priceCLP:100,url:"https://example.com/a"},{companyId:"b",companyName:"B",priceCLP:180,url:"https://example.com/b"}]},{...base,id:2,name:"Ryzen avanzado",offers:[{companyId:"b",companyName:"B",priceCLP:150,url:"https://example.com/2"}]},{...base,id:3,name:"Sin oferta",category:"ram",offers:[]}];
 const defaults={query:"",category:"",companyIds:[],sort:"price-asc"};
 assert.equal(filterCatalogue(products,defaults).length,3);
@@ -13,3 +14,7 @@ assert.equal(filterCatalogue(products,{...defaults,query:"inexistente"}).length,
 assert.deepEqual(filterCatalogue(products,{...defaults,sort:"price-desc"}).map(p=>p.id),[2,1,3]);
 assert.equal(products[0].offers.length,2,"Filtrar no modifica las ofertas originales");
 console.log("Catálogo: filtros, búsqueda, precios por tienda, orden y referencias correctos.");
+
+const mapped=catalogueProducts({updatedAt:"2026-11-23T09:00:00Z",products:[{id:1,name:"CPU",brand:"AMD",category:"cpu",priceCLP:100,solotodoUrl:"https://www.solotodo.cl/products/1",socket:"AM5",specs:{}}],offers:{"1":[{storeId:"a",store:"A",storeUrl:"https://shop.example/product/1",priceCLP:100}]}});
+assert(!("referenceUrl" in mapped[0]),"El catálogo público no necesita enlaces de SoloTodo");
+assert.equal(mapped[0].offers[0].url,"https://shop.example/product/1");
