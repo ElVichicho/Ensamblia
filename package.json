@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node scripts/check-quote-selection.mjs && node scripts/check-component-alternatives.mjs && node scripts/check-demo-mode.mjs && node scripts/check-catalog-storage.mjs && node scripts/check-catalogue.mjs",
+    "test": "node scripts/check-quote-selection.mjs && node scripts/check-component-alternatives.mjs && node scripts/check-demo-mode.mjs && node scripts/check-catalog-storage.mjs && node scripts/check-catalogue.mjs && node scripts/check-ai-response.mjs",
     "fetch-catalog": "node scripts/fetch-catalog.mjs"
   },
   "dependencies": {
+    "jsonrepair": "3.15.0",
     "lucide-react": "^1.69.0",
     "next": "16.4.5",
     "react": "19.3.0",
