@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- Publicación compatible con `safeupdate`, diagnóstico sin secretos y vigencia de recuperaciones anteriores al horario diario.
+
 - Inicio Pulso con empresas del catálogo y cotizador independiente en `/cotizador`, conservando preferencias, tabla de piezas, alternativas y ambos temas.
 - Cotización en una o varias empresas: los productos y precios se filtran antes de generar y al cambiar piezas.
 - Migración del catálogo de Redis a Supabase Postgres, con RLS, versiones publicadas de forma transaccional, registros de sincronización y lectura pública sin credenciales de escritura.
